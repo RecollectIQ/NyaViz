@@ -230,14 +230,6 @@ struct AdditionalControlsView: View {
                     .foregroundColor(SettingsManager.accentDim)
             }
             .buttonStyle(.plain)
-            
-            // Settings
-            Button(action: { settings.showSettings.toggle() }) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 16))
-                    .foregroundColor(SettingsManager.accentDim)
-            }
-            .buttonStyle(.plain)
         }
     }
 }

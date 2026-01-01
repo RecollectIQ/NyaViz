@@ -19,25 +19,45 @@ struct Lyric: Identifiable, Equatable {
 struct SRTParser {
     static func parse(_ content: String) -> [Lyric] {
         var lyrics: [Lyric] = []
-        let blocks = content.components(separatedBy: "\n\n")
+        
+        // Normalize line endings (handle Windows \r\n, old Mac \r, and Unix \n)
+        let normalizedContent = content
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            // Remove BOM if present
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\u{FEFF}"))
+        
+        // Split by double newlines (empty lines between blocks)
+        // Also handle cases where there might be more than 2 newlines
+        let blocks = normalizedContent.components(separatedBy: "\n\n")
         
         for block in blocks {
-            let lines = block.components(separatedBy: "\n").filter { !$0.isEmpty }
+            let trimmedBlock = block.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedBlock.isEmpty else { continue }
+            
+            let lines = trimmedBlock.components(separatedBy: "\n").map { 
+                $0.trimmingCharacters(in: .whitespaces) 
+            }.filter { !$0.isEmpty }
+            
             guard lines.count >= 2 else { continue }
             
             // Find the timestamp line (contains " --> ")
-            guard let timestampLine = lines.first(where: { $0.contains(" --> ") }) else { continue }
+            guard let timestampLineIndex = lines.firstIndex(where: { $0.contains("-->") }) else { continue }
+            let timestampLine = lines[timestampLineIndex]
             
-            let timestamps = timestampLine.components(separatedBy: " --> ")
+            // Parse timestamps - handle both " --> " and "-->" formats
+            let arrowPattern = timestampLine.contains(" --> ") ? " --> " : "-->"
+            let timestamps = timestampLine.components(separatedBy: arrowPattern)
+            
             guard timestamps.count == 2,
                   let startTime = parseTimestamp(timestamps[0].trimmingCharacters(in: .whitespaces)),
                   let endTime = parseTimestamp(timestamps[1].trimmingCharacters(in: .whitespaces)) else { continue }
             
             // Get text lines (everything after timestamp line)
-            let timestampIndex = lines.firstIndex(of: timestampLine) ?? 0
-            let textLines = lines.dropFirst(timestampIndex + 1)
-            let text = textLines.joined(separator: "\n")
+            let textLines = lines.dropFirst(timestampLineIndex + 1)
+            let text = textLines.joined(separator: " ")
                 .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\{[^}]+\\}", with: "", options: .regularExpression) // Remove ASS tags like {\an8}
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             
             if !text.isEmpty {
@@ -50,7 +70,15 @@ struct SRTParser {
     
     private static func parseTimestamp(_ string: String) -> TimeInterval? {
         // Support both "00:00:00,000" and "00:00:00.000" formats
-        let normalized = string.replacingOccurrences(of: ",", with: ".")
+        var normalized = string
+            .replacingOccurrences(of: ",", with: ".")
+            .trimmingCharacters(in: .whitespaces)
+        
+        // Remove any position data after timestamp (e.g., "00:00:00.000 X1:0 X2:0")
+        if let spaceIndex = normalized.firstIndex(of: " ") {
+            normalized = String(normalized[..<spaceIndex])
+        }
+        
         let components = normalized.components(separatedBy: ":")
         
         guard components.count >= 2 else { return nil }
@@ -72,3 +100,29 @@ struct SRTParser {
     }
 }
 
+// MARK: - File Loading Helper
+
+extension SRTParser {
+    static func load(from url: URL) -> [Lyric] {
+        // Try different encodings
+        let encodings: [String.Encoding] = [.utf8, .utf16, .isoLatin1, .windowsCP1252, .ascii]
+        
+        for encoding in encodings {
+            if let content = try? String(contentsOf: url, encoding: encoding) {
+                let lyrics = parse(content)
+                if !lyrics.isEmpty {
+                    return lyrics
+                }
+            }
+        }
+        
+        // Fallback: try to detect encoding
+        if let data = try? Data(contentsOf: url),
+           let content = String(data: data, encoding: .utf8) ?? 
+                         String(data: data, encoding: .isoLatin1) {
+            return parse(content)
+        }
+        
+        return []
+    }
+}

@@ -14,27 +14,12 @@ struct LyricsView: View {
             ZStack {
                 if audioPlayer.hasLyrics {
                     SmoothLyricsView(containerHeight: geo.size.height)
-                } else {
-                    // Minimal empty state
-                    VStack(spacing: 16) {
-                        Image(systemName: "text.quote")
-                            .font(.system(size: 48, weight: .ultraLight))
-                            .foregroundColor(Color.white.opacity(0.15))
-                        
-                        Button(action: { audioPlayer.showSRTPicker = true }) {
-                            Text("Load SRT")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(
-                                    Capsule()
-                                        .fill(.white)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+            } else {
+                // Minimal empty state
+                Image(systemName: "text.quote")
+                    .font(.system(size: 48, weight: .ultraLight))
+                    .foregroundColor(Color.white.opacity(0.1))
+            }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }

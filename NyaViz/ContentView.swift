@@ -38,6 +38,30 @@ struct ContentView: View {
                 .padding(.bottom, 40)
             }
             
+            // Settings Button (top right) - hidden when panel is open
+            if !settings.showSettings {
+                VStack {
+                    HStack {
+                        Spacer()
+                        
+                        Button(action: { settings.showSettings.toggle() }) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white.opacity(0.6))
+                                .frame(width: 36, height: 36)
+                                .background(
+                                    Circle()
+                                        .fill(Color.black.opacity(0.3))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 20)
+                        .padding(.top, 16)
+                    }
+                    Spacer()
+                }
+            }
+            
             // Settings Panel
             if settings.showSettings {
                 SettingsPanelView()

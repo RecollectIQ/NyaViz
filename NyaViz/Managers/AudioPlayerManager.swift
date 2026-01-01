@@ -57,13 +57,10 @@ class AudioPlayerManager: ObservableObject {
     }
     
     func loadSRT(from url: URL) {
-        do {
-            let content = try String(contentsOf: url, encoding: .utf8)
-            lyrics = SRTParser.parse(content)
-            updateCurrentLyric()
-        } catch {
-            print("Error loading SRT: \(error.localizedDescription)")
-        }
+        lyrics = SRTParser.load(from: url)
+        currentLyricIndex = -1
+        updateCurrentLyric()
+        print("Loaded \(lyrics.count) lyrics from SRT")
     }
     
     func play() {

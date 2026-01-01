@@ -35,17 +35,14 @@ struct SettingsPanelView: View {
                     Button(action: { settings.showSettings = false }) {
                         Image(systemName: "xmark")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(SettingsManager.accentDim)
+                            .foregroundColor(.white.opacity(0.5))
                             .frame(width: 28, height: 28)
-                            .background(Circle().fill(Color.white.opacity(0.06)))
+                            .background(Circle().fill(Color.black.opacity(0.2)))
                     }
                     .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
-                
-                Divider()
-                    .background(Color.white.opacity(0.06))
                 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -191,7 +188,7 @@ struct SettingsPanelView: View {
                 }
             }
             .frame(width: 280)
-            .background(SettingsManager.surface)
+            .background(.clear)
         }
     }
     
@@ -254,7 +251,7 @@ struct SettingsSection<Content: View>: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title.uppercased())
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(SettingsManager.accentDim)
+                .foregroundColor(.white.opacity(0.4))
                 .tracking(1)
             
             VStack(spacing: 10) {
@@ -263,7 +260,7 @@ struct SettingsSection<Content: View>: View {
             .padding(14)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.white.opacity(0.04))
+                    .fill(Color.black.opacity(0.2))
             )
         }
     }
@@ -280,21 +277,21 @@ struct SettingsButton: View {
             HStack(spacing: 10) {
                 Image(systemName: icon)
                     .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.white.opacity(0.5))
                     .frame(width: 28, height: 28)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.white.opacity(0.06))
+                            .fill(Color.black.opacity(0.15))
                     )
                 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(.white.opacity(0.9))
                     
                     Text(subtitle)
                         .font(.system(size: 11))
-                        .foregroundColor(SettingsManager.accentDim)
+                        .foregroundColor(.white.opacity(0.4))
                         .lineLimit(1)
                 }
                 
@@ -302,7 +299,7 @@ struct SettingsButton: View {
                 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(Color.white.opacity(0.2))
+                    .foregroundColor(.white.opacity(0.2))
             }
         }
         .buttonStyle(.plain)
@@ -340,12 +337,32 @@ struct SettingsSlider: View {
                 
                 Text(String(format: "%.1f", value))
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(SettingsManager.accentDim)
+                    .foregroundColor(.white.opacity(0.4))
             }
             
             Slider(value: $value, in: range)
-                .tint(.white)
+                .tint(.white.opacity(0.8))
         }
+    }
+}
+
+// MARK: - Visual Effect Blur (NSVisualEffectView wrapper)
+
+struct VisualEffectBlur: NSViewRepresentable {
+    var material: NSVisualEffectView.Material
+    var blendingMode: NSVisualEffectView.BlendingMode
+    
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = blendingMode
+        view.state = .active
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = material
+        nsView.blendingMode = blendingMode
     }
 }
 

@@ -21,44 +21,44 @@ struct FullScreenLyricsView: View {
                         .foregroundColor(Color.white.opacity(0.1))
                 }
                 
-                // Track info at top (if enabled)
+                // Track info at top left (if enabled)
                 if settings.showTrackTitle && !audioPlayer.audioFileName.isEmpty {
                     VStack {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(audioPlayer.audioFileName)
-                                    .font(.system(size: 15, weight: .medium, design: .default))
-                                    .foregroundColor(.white.opacity(0.8))
-                                
-                                Text(formatTime(audioPlayer.currentTime) + " / " + formatTime(audioPlayer.duration))
-                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                    .foregroundColor(SettingsManager.accentDim)
-                            }
-                            
-                            Spacer()
-                            
+                        HStack(alignment: .center, spacing: 12) {
                             // Progress ring
                             ZStack {
                                 Circle()
-                                    .stroke(Color.white.opacity(0.1), lineWidth: 2)
-                                    .frame(width: 36, height: 36)
+                                    .stroke(Color.white.opacity(0.15), lineWidth: 2)
+                                    .frame(width: 32, height: 32)
                                 
                                 Circle()
                                     .trim(from: 0, to: audioPlayer.progress)
-                                    .stroke(Color.white, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                                    .frame(width: 36, height: 36)
+                                    .stroke(Color.white.opacity(0.8), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                                    .frame(width: 32, height: 32)
                                     .rotationEffect(.degrees(-90))
                                 
                                 Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.white)
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.white.opacity(0.8))
                             }
                             .onTapGesture {
                                 audioPlayer.togglePlayPause()
                             }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(audioPlayer.audioFileName)
+                                    .font(.system(size: 14, weight: .medium, design: .default))
+                                    .foregroundColor(.white.opacity(0.8))
+                                
+                                Text(formatTime(audioPlayer.currentTime) + " / " + formatTime(audioPlayer.duration))
+                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                    .foregroundColor(.white.opacity(0.4))
+                            }
+                            
+                            Spacer()
                         }
-                        .padding(.horizontal, 32)
-                        .padding(.top, 24)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 20)
                         
                         Spacer()
                     }
