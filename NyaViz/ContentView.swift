@@ -12,6 +12,7 @@ struct ContentView: View {
     @EnvironmentObject var settings: SettingsManager
     @State private var showControls = true
     @State private var controlsTimer: Timer?
+    @State private var showSettingsButton = false
     
     var body: some View {
         ZStack {
@@ -38,7 +39,7 @@ struct ContentView: View {
                 .padding(.bottom, 40)
             }
             
-            // Settings Button (top right) - hidden when panel is open
+            // Settings Button (top right) - hidden when panel is open, shows on hover
             if !settings.showSettings {
                 VStack {
                     HStack {
@@ -47,20 +48,17 @@ struct ContentView: View {
                         Button(action: { settings.showSettings.toggle() }) {
                             Image(systemName: "slider.horizontal.3")
                                 .font(.system(size: 16))
-                                .foregroundColor(.white.opacity(0.7))
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    Circle()
-                                        .fill(Color.white.opacity(0.08))
-                                        .overlay(
-                                            Circle()
-                                                .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
-                                        )
-                                )
+                                .foregroundColor(.white.opacity(0.25))
+                                .opacity(showSettingsButton ? 1 : 0)
                         }
                         .buttonStyle(.plain)
-                        .padding(.trailing, 20)
-                        .padding(.top, 16)
+                        .frame(width: 60, height: 60)
+                        .contentShape(Rectangle())
+                        .onHover { hovering in
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showSettingsButton = hovering
+                            }
+                        }
                     }
                     Spacer()
                 }
