@@ -2,52 +2,72 @@
 //  ContentView.swift
 //  NyaViz
 //
-//  Created by Kira Pgr on 12/31/25.
-//
 
 import SwiftUI
-import SwiftData
+import UniformTypeIdentifiers
+import AppKit
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
-
+    @EnvironmentObject var audioPlayer: AudioPlayerManager
+    @EnvironmentObject var settings: SettingsManager
+    @State private var showControls = true
+    @State private var controlsTimer: Timer?
+    
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
+        ZStack {
+            // Background Layer
+            BackgroundView()
+            
+            // Main Content
+            if settings.isFullScreen {
+                FullScreenLyricsView()
+                    .transition(.opacity)
+            } else {
+                MainPlayerView()
+                    .transition(.opacity)
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-            .toolbar {
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
+            
+            // Floating Controls (appear on hover in fullscreen)
+            if settings.isFullScreen {
+                VStack {
+                    Spacer()
+                    FloatingControlsView()
+                        .opacity(showControls ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.3), value: showControls)
+                }
+                .padding(.bottom, 40)
+            }
+            
+            // Settings Panel
+            if settings.showSettings {
+                SettingsPanelView()
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onHover { hovering in
+            if settings.isFullScreen {
+                showControls = hovering
+                resetControlsTimer()
+            }
+        }
+        .onTapGesture {
+            if settings.isFullScreen {
+                showControls.toggle()
+                if showControls {
+                    resetControlsTimer()
                 }
             }
-        } detail: {
-            Text("Select an item")
         }
+        .animation(.easeInOut(duration: 0.4), value: settings.isFullScreen)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: settings.showSettings)
     }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+    
+    private func resetControlsTimer() {
+        controlsTimer?.invalidate()
+        controlsTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: false) { _ in
+            withAnimation {
+                showControls = false
             }
         }
     }
@@ -55,5 +75,6 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .environmentObject(AudioPlayerManager())
+        .environmentObject(SettingsManager())
 }

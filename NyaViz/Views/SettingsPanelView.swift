@@ -1,0 +1,358 @@
+//
+//  SettingsPanelView.swift
+//  NyaViz
+//
+
+import SwiftUI
+import UniformTypeIdentifiers
+import AppKit
+
+struct SettingsPanelView: View {
+    @EnvironmentObject var audioPlayer: AudioPlayerManager
+    @EnvironmentObject var settings: SettingsManager
+    
+    private var linesLabel: String {
+        switch settings.lyricLinesVisible {
+        case 1: return "1 + 1"
+        case 2: return "2 + 2"
+        default: return "3 + 3"
+        }
+    }
+    
+    var body: some View {
+        HStack {
+            Spacer()
+            
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Text("Settings")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                    
+                    Button(action: { settings.showSettings = false }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(SettingsManager.accentDim)
+                            .frame(width: 28, height: 28)
+                            .background(Circle().fill(Color.white.opacity(0.06)))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                
+                Divider()
+                    .background(Color.white.opacity(0.06))
+                
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Files Section
+                        SettingsSection(title: "Files") {
+                            VStack(spacing: 10) {
+                                SettingsButton(
+                                    icon: "music.note",
+                                    title: "Open Audio",
+                                    subtitle: audioPlayer.audioFileName.isEmpty ? "No file" : audioPlayer.audioFileName
+                                ) {
+                                    openAudioFile()
+                                }
+                                
+                                SettingsButton(
+                                    icon: "text.alignleft",
+                                    title: "Open SRT",
+                                    subtitle: audioPlayer.hasLyrics ? "\(audioPlayer.lyrics.count) lines" : "No file"
+                                ) {
+                                    openSRTFile()
+                                }
+                            }
+                        }
+                        
+                        // Background Section
+                        SettingsSection(title: "Background") {
+                            VStack(spacing: 12) {
+                                // Background image
+                                SettingsButton(
+                                    icon: "photo",
+                                    title: "Background Image",
+                                    subtitle: settings.backgroundImage != nil ? "Set" : "None"
+                                ) {
+                                    openBackgroundImage()
+                                }
+                                
+                                // Blur
+                                SettingsSlider(
+                                    title: "Blur",
+                                    value: $settings.backgroundBlur,
+                                    range: 0...30
+                                )
+                                
+                                // Opacity
+                                SettingsSlider(
+                                    title: "Opacity",
+                                    value: $settings.backgroundOpacity,
+                                    range: 0...1
+                                )
+                                
+                                // Particles
+                                Toggle(isOn: $settings.showParticles) {
+                                    Text("Snow Particles")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                                .toggleStyle(.switch)
+                                .tint(.white)
+                                
+                                if settings.showParticles {
+                                    SettingsSlider(
+                                        title: "Particle Density",
+                                        value: $settings.particleDensity,
+                                        range: 0.2...2.0
+                                    )
+                                }
+                            }
+                        }
+                        
+                        // Player Section
+                        SettingsSection(title: "Player") {
+                            VStack(spacing: 12) {
+                                Toggle(isOn: $settings.showArtwork) {
+                                    Text("Show Artwork")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                                .toggleStyle(.switch)
+                                .tint(.white)
+                                
+                                if settings.showArtwork {
+                                    SettingsButton(
+                                        icon: "square",
+                                        title: "Set Artwork",
+                                        subtitle: settings.artworkImage != nil ? "Custom" : "None"
+                                    ) {
+                                        openArtworkImage()
+                                    }
+                                }
+                                
+                                Toggle(isOn: $settings.showTrackTitle) {
+                                    Text("Show Track Title")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                                .toggleStyle(.switch)
+                                .tint(.white)
+                                
+                                Toggle(isOn: $audioPlayer.isLooping) {
+                                    Text("Loop Audio")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                                .toggleStyle(.switch)
+                                .tint(.white)
+                            }
+                        }
+                        
+                        // Lyrics Section
+                        SettingsSection(title: "Lyrics") {
+                            VStack(spacing: 12) {
+                                SettingsSlider(
+                                    title: "Font Size",
+                                    value: $settings.lyricFontSize,
+                                    range: 28...72
+                                )
+                                
+                                // Lines visible
+                                VStack(spacing: 6) {
+                                    HStack {
+                                        Text("Visible Lines")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.white.opacity(0.7))
+                                        
+                                        Spacer()
+                                        
+                                        Text(linesLabel)
+                                            .font(.system(size: 11))
+                                            .foregroundColor(SettingsManager.accentDim)
+                                    }
+                                    
+                                    Picker("", selection: $settings.lyricLinesVisible) {
+                                        Text("Minimal").tag(1)
+                                        Text("Normal").tag(2)
+                                        Text("Max").tag(3)
+                                    }
+                                    .pickerStyle(.segmented)
+                                }
+                            }
+                        }
+                    }
+                    .padding(20)
+                }
+            }
+            .frame(width: 280)
+            .background(SettingsManager.surface)
+        }
+    }
+    
+    private func openAudioFile() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.audio, .mp3, .wav, .aiff, UTType(filenameExtension: "m4a")!]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "Select an audio file"
+        
+        if panel.runModal() == .OK, let url = panel.url {
+            audioPlayer.loadAudio(from: url)
+        }
+    }
+    
+    private func openSRTFile() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "srt")!, .plainText]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "Select an SRT file"
+        
+        if panel.runModal() == .OK, let url = panel.url {
+            audioPlayer.loadSRT(from: url)
+        }
+    }
+    
+    private func openBackgroundImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image, .png, .jpeg]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "Select background image"
+        
+        if panel.runModal() == .OK, let url = panel.url {
+            settings.loadBackgroundImage(from: url)
+        }
+    }
+    
+    private func openArtworkImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image, .png, .jpeg]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "Select artwork image"
+        
+        if panel.runModal() == .OK, let url = panel.url {
+            settings.loadArtworkImage(from: url)
+        }
+    }
+}
+
+// MARK: - Settings Components
+
+struct SettingsSection<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: Content
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(SettingsManager.accentDim)
+                .tracking(1)
+            
+            VStack(spacing: 10) {
+                content
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.white.opacity(0.04))
+            )
+        }
+    }
+}
+
+struct SettingsButton: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.6))
+                    .frame(width: 28, height: 28)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white.opacity(0.06))
+                    )
+                
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white)
+                    
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundColor(SettingsManager.accentDim)
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(Color.white.opacity(0.2))
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct SettingsSlider: View {
+    let title: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    
+    init(title: String, value: Binding<Double>, range: ClosedRange<Double>) {
+        self.title = title
+        self._value = value
+        self.range = range
+    }
+    
+    init(title: String, value: Binding<CGFloat>, range: ClosedRange<Double>) {
+        self.title = title
+        self._value = Binding(
+            get: { Double(value.wrappedValue) },
+            set: { value.wrappedValue = CGFloat($0) }
+        )
+        self.range = range
+    }
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.7))
+                
+                Spacer()
+                
+                Text(String(format: "%.1f", value))
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(SettingsManager.accentDim)
+            }
+            
+            Slider(value: $value, in: range)
+                .tint(.white)
+        }
+    }
+}
+
+#Preview {
+    SettingsPanelView()
+        .environmentObject(AudioPlayerManager())
+        .environmentObject(SettingsManager())
+        .background(Color.black)
+        .frame(height: 700)
+}
