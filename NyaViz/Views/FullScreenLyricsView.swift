@@ -237,10 +237,10 @@ struct FloatingControlsView: View {
         .padding(.vertical, 12)
         .background(
             Capsule()
-                .fill(Color.black.opacity(0.4))
+                .fill(Color.white.opacity(0.08))
                 .overlay(
                     Capsule()
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
                 )
         )
     }

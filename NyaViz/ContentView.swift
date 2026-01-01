@@ -47,11 +47,15 @@ struct ContentView: View {
                         Button(action: { settings.showSettings.toggle() }) {
                             Image(systemName: "slider.horizontal.3")
                                 .font(.system(size: 16))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(.white.opacity(0.7))
                                 .frame(width: 36, height: 36)
                                 .background(
                                     Circle()
-                                        .fill(Color.black.opacity(0.3))
+                                        .fill(Color.white.opacity(0.08))
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                                        )
                                 )
                         }
                         .buttonStyle(.plain)

@@ -20,29 +20,32 @@ struct SettingsPanelView: View {
     }
     
     var body: some View {
-        HStack {
+        HStack(spacing: 0) {
             Spacer()
+            
+            // Divider
+            Rectangle()
+                .fill(Color.white.opacity(0.06))
+                .frame(width: 1)
             
             VStack(spacing: 0) {
                 // Header
                 HStack {
                     Text("Settings")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
                     
                     Spacer()
                     
                     Button(action: { settings.showSettings = false }) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                            .frame(width: 28, height: 28)
-                            .background(Circle().fill(Color.black.opacity(0.2)))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
                 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -97,10 +100,10 @@ struct SettingsPanelView: View {
                                 Toggle(isOn: $settings.showParticles) {
                                     Text("Snow Particles")
                                         .font(.system(size: 13))
-                                        .foregroundColor(.white.opacity(0.8))
+                                        .foregroundColor(.white.opacity(0.7))
                                 }
                                 .toggleStyle(.switch)
-                                .tint(.white)
+                                .tint(.white.opacity(0.6))
                                 
                                 if settings.showParticles {
                                     SettingsSlider(
@@ -118,10 +121,10 @@ struct SettingsPanelView: View {
                                 Toggle(isOn: $settings.showArtwork) {
                                     Text("Show Artwork")
                                         .font(.system(size: 13))
-                                        .foregroundColor(.white.opacity(0.8))
+                                        .foregroundColor(.white.opacity(0.7))
                                 }
                                 .toggleStyle(.switch)
-                                .tint(.white)
+                                .tint(.white.opacity(0.6))
                                 
                                 if settings.showArtwork {
                                     SettingsButton(
@@ -136,18 +139,18 @@ struct SettingsPanelView: View {
                                 Toggle(isOn: $settings.showTrackTitle) {
                                     Text("Show Track Title")
                                         .font(.system(size: 13))
-                                        .foregroundColor(.white.opacity(0.8))
+                                        .foregroundColor(.white.opacity(0.7))
                                 }
                                 .toggleStyle(.switch)
-                                .tint(.white)
+                                .tint(.white.opacity(0.6))
                                 
                                 Toggle(isOn: $audioPlayer.isLooping) {
                                     Text("Loop Audio")
                                         .font(.system(size: 13))
-                                        .foregroundColor(.white.opacity(0.8))
+                                        .foregroundColor(.white.opacity(0.7))
                                 }
                                 .toggleStyle(.switch)
-                                .tint(.white)
+                                .tint(.white.opacity(0.6))
                             }
                         }
                         
@@ -184,11 +187,11 @@ struct SettingsPanelView: View {
                             }
                         }
                     }
-                    .padding(20)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
                 }
             }
-            .frame(width: 280)
-            .background(.clear)
+            .frame(width: 260)
         }
     }
     
@@ -251,17 +254,12 @@ struct SettingsSection<Content: View>: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title.uppercased())
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundColor(.white.opacity(0.35))
                 .tracking(1)
             
-            VStack(spacing: 10) {
+            VStack(spacing: 12) {
                 content
             }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.black.opacity(0.2))
-            )
         }
     }
 }
@@ -277,28 +275,24 @@ struct SettingsButton: View {
             HStack(spacing: 10) {
                 Image(systemName: icon)
                     .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.5))
-                    .frame(width: 28, height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.black.opacity(0.15))
-                    )
+                    .foregroundColor(.white.opacity(0.4))
+                    .frame(width: 20)
                 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(.white.opacity(0.8))
                     
                     Text(subtitle)
                         .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(.white.opacity(0.35))
                         .lineLimit(1)
                 }
                 
                 Spacer()
                 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.white.opacity(0.2))
             }
         }
@@ -331,17 +325,17 @@ struct SettingsSlider: View {
             HStack {
                 Text(title)
                     .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(.white.opacity(0.6))
                 
                 Spacer()
                 
                 Text(String(format: "%.1f", value))
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(.white.opacity(0.35))
             }
             
             Slider(value: $value, in: range)
-                .tint(.white.opacity(0.8))
+                .tint(.white.opacity(0.5))
         }
     }
 }
