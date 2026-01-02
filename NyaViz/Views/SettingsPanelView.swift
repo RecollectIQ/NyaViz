@@ -97,13 +97,7 @@ struct SettingsPanelView: View {
                                 )
                                 
                                 // Particles
-                                Toggle(isOn: $settings.showParticles) {
-                                    Text("Snow Particles")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(.white.opacity(0.7))
-                                }
-                                .toggleStyle(.switch)
-                                .tint(.white.opacity(0.6))
+                                SettingsToggle(title: "Snow Particles", isOn: $settings.showParticles)
                                 
                                 if settings.showParticles {
                                     SettingsSlider(
@@ -118,21 +112,8 @@ struct SettingsPanelView: View {
                         // Player Section
                         SettingsSection(title: "Player") {
                             VStack(spacing: 12) {
-                                Toggle(isOn: $settings.verticalLayout) {
-                                    Text("Vertical Layout")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(.white.opacity(0.7))
-                                }
-                                .toggleStyle(.switch)
-                                .tint(.white.opacity(0.6))
-                                
-                                Toggle(isOn: $settings.showArtwork) {
-                                    Text("Show Artwork")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(.white.opacity(0.7))
-                                }
-                                .toggleStyle(.switch)
-                                .tint(.white.opacity(0.6))
+                                SettingsToggle(title: "Vertical Layout", isOn: $settings.verticalLayout)
+                                SettingsToggle(title: "Show Artwork", isOn: $settings.showArtwork)
                                 
                                 if settings.showArtwork {
                                     SettingsButton(
@@ -144,21 +125,8 @@ struct SettingsPanelView: View {
                                     }
                                 }
                                 
-                                Toggle(isOn: $settings.showTrackTitle) {
-                                    Text("Show Track Title")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(.white.opacity(0.7))
-                                }
-                                .toggleStyle(.switch)
-                                .tint(.white.opacity(0.6))
-                                
-                                Toggle(isOn: $audioPlayer.isLooping) {
-                                    Text("Loop Audio")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(.white.opacity(0.7))
-                                }
-                                .toggleStyle(.switch)
-                                .tint(.white.opacity(0.6))
+                                SettingsToggle(title: "Show Track Title", isOn: $settings.showTrackTitle)
+                                SettingsToggle(title: "Loop Audio", isOn: $audioPlayer.isLooping)
                             }
                         }
                         
@@ -305,6 +273,29 @@ struct SettingsButton: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct SettingsToggle: View {
+    let title: String
+    @Binding var isOn: Bool
+    
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 13))
+                .foregroundColor(.white.opacity(0.7))
+            
+            Spacer()
+            
+            Button(action: { isOn.toggle() }) {
+                Text(isOn ? "On" : "Off")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(isOn ? .white.opacity(0.9) : .white.opacity(0.35))
+                    .frame(width: 28, alignment: .trailing)
+            }
+            .buttonStyle(.plain)
+        }
     }
 }
 
