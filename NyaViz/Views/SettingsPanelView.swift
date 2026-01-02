@@ -118,6 +118,14 @@ struct SettingsPanelView: View {
                         // Player Section
                         SettingsSection(title: "Player") {
                             VStack(spacing: 12) {
+                                Toggle(isOn: $settings.verticalLayout) {
+                                    Text("Vertical Layout")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                                .toggleStyle(.switch)
+                                .tint(.white.opacity(0.6))
+                                
                                 Toggle(isOn: $settings.showArtwork) {
                                     Text("Show Artwork")
                                         .font(.system(size: 13))

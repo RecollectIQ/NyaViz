@@ -56,6 +56,11 @@ class SettingsManager: ObservableObject {
     @Published var isFullScreen: Bool = false
     @Published var showSettings: Bool = false
     
+    // Layout
+    @Published var verticalLayout: Bool = false {
+        didSet { defaults.set(verticalLayout, forKey: "verticalLayout") }
+    }
+    
     // Lyrics
     @Published var lyricFontSize: CGFloat = 48 {
         didSet { defaults.set(Double(lyricFontSize), forKey: Keys.lyricFontSize) }
@@ -116,6 +121,9 @@ class SettingsManager: ObservableObject {
         }
         if defaults.object(forKey: Keys.lyricLinesVisible) != nil {
             lyricLinesVisible = defaults.integer(forKey: Keys.lyricLinesVisible)
+        }
+        if defaults.object(forKey: "verticalLayout") != nil {
+            verticalLayout = defaults.bool(forKey: "verticalLayout")
         }
         
         // Load cached images from app support directory
