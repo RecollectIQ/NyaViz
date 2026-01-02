@@ -4,11 +4,40 @@
 //
 
 import SwiftUI
+import CoreText
 
 @main
 struct NyaVizApp: App {
     @StateObject private var audioPlayer = AudioPlayerManager()
     @StateObject private var settingsManager = SettingsManager()
+    
+    init() {
+        // Register custom fonts
+        registerFonts()
+    }
+    
+    private func registerFonts() {
+        // Try to load from bundle first
+        if let fontURL = Bundle.main.url(forResource: "Mollen Trial-Bold", withExtension: "ttf", subdirectory: "Fonts") {
+            CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
+        }
+        
+        // Fallback: try from mollen folder in app directory
+        if let resourcePath = Bundle.main.resourcePath {
+            let fontPaths = [
+                "\(resourcePath)/Fonts/Mollen Trial-Bold.ttf",
+                "\(resourcePath)/../../../mollen/Mollen Trial-Bold.ttf"
+            ]
+            
+            for path in fontPaths {
+                let fontURL = URL(fileURLWithPath: path)
+                if FileManager.default.fileExists(atPath: path) {
+                    CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
+                    break
+                }
+            }
+        }
+    }
     
     var body: some Scene {
         WindowGroup {

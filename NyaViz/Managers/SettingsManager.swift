@@ -20,6 +20,12 @@ class SettingsManager: ObservableObject {
         static let particleDensity = "particleDensity"
         static let lyricFontSize = "lyricFontSize"
         static let lyricLinesVisible = "lyricLinesVisible"
+        // Visualizer
+        static let showVisualizer = "showVisualizer"
+        static let visualizerBarWidth = "visualizerBarWidth"
+        static let visualizerBarCount = "visualizerBarCount"
+        static let visualizerBarGap = "visualizerBarGap"
+        static let visualizerBarOpacity = "visualizerBarOpacity"
     }
     
     // File names for cached images
@@ -67,6 +73,23 @@ class SettingsManager: ObservableObject {
     }
     @Published var lyricLinesVisible: Int = 2 {
         didSet { defaults.set(lyricLinesVisible, forKey: Keys.lyricLinesVisible) }
+    }
+    
+    // Visualizer
+    @Published var showVisualizer: Bool = true {
+        didSet { defaults.set(showVisualizer, forKey: Keys.showVisualizer) }
+    }
+    @Published var visualizerBarWidth: CGFloat = 4 {
+        didSet { defaults.set(Double(visualizerBarWidth), forKey: Keys.visualizerBarWidth) }
+    }
+    @Published var visualizerBarCount: Int = 48 {
+        didSet { defaults.set(visualizerBarCount, forKey: Keys.visualizerBarCount) }
+    }
+    @Published var visualizerBarGap: CGFloat = 3 {
+        didSet { defaults.set(Double(visualizerBarGap), forKey: Keys.visualizerBarGap) }
+    }
+    @Published var visualizerBarOpacity: Double = 0.5 {
+        didSet { defaults.set(visualizerBarOpacity, forKey: Keys.visualizerBarOpacity) }
     }
     
     // Static colors
@@ -124,6 +147,23 @@ class SettingsManager: ObservableObject {
         }
         if defaults.object(forKey: "verticalLayout") != nil {
             verticalLayout = defaults.bool(forKey: "verticalLayout")
+        }
+        
+        // Visualizer settings
+        if defaults.object(forKey: Keys.showVisualizer) != nil {
+            showVisualizer = defaults.bool(forKey: Keys.showVisualizer)
+        }
+        if defaults.object(forKey: Keys.visualizerBarWidth) != nil {
+            visualizerBarWidth = CGFloat(defaults.double(forKey: Keys.visualizerBarWidth))
+        }
+        if defaults.object(forKey: Keys.visualizerBarCount) != nil {
+            visualizerBarCount = defaults.integer(forKey: Keys.visualizerBarCount)
+        }
+        if defaults.object(forKey: Keys.visualizerBarGap) != nil {
+            visualizerBarGap = CGFloat(defaults.double(forKey: Keys.visualizerBarGap))
+        }
+        if defaults.object(forKey: Keys.visualizerBarOpacity) != nil {
+            visualizerBarOpacity = defaults.double(forKey: Keys.visualizerBarOpacity)
         }
         
         // Load cached images from app support directory

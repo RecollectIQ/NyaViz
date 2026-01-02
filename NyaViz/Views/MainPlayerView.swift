@@ -13,7 +13,16 @@ struct MainPlayerView: View {
         GeometryReader { geo in
             if settings.verticalLayout {
                 // Vertical Layout - Title top, lyrics center, controls bottom on hover
-                VerticalModeView()
+                ZStack(alignment: .bottom) {
+                    VerticalModeView()
+                    
+                    // Audio Visualizer at the bottom (full width in vertical mode)
+                    if settings.showVisualizer {
+                        AudioVisualizerView()
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 12)
+                    }
+                }
             } else {
                 // Horizontal Layout - Original
                 HStack(spacing: 0) {
@@ -58,9 +67,19 @@ struct MainPlayerView: View {
                         .fill(Color.white.opacity(0.06))
                         .frame(width: 1)
                     
-                    // Right Panel - Lyrics
-                    LyricsView()
-                        .frame(maxWidth: .infinity)
+                    // Right Panel - Lyrics with Visualizer
+                    ZStack(alignment: .bottom) {
+                        LyricsView()
+                            .frame(maxWidth: .infinity)
+                        
+                        // Audio Visualizer centered in lyrics area
+                        if settings.showVisualizer {
+                            AudioVisualizerView()
+                                .padding(.horizontal, 24)
+                                .padding(.bottom, 12)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                 }
             }
         }
@@ -248,45 +267,87 @@ struct VerticalLyricsContent: View {
         settings.lyricLinesVisible + 1
     }
     
+    private var isOneLineMode: Bool {
+        settings.lyricLinesVisible == 1
+    }
+    
     var body: some View {
         if audioPlayer.hasLyrics {
-            VStack(spacing: lineSpacing) {
-                // Current lyric (bright, bold)
-                if audioPlayer.currentLyricIndex >= 0 && audioPlayer.currentLyricIndex < audioPlayer.lyrics.count {
-                    Text(audioPlayer.lyrics[audioPlayer.currentLyricIndex].text)
-                        .font(.system(size: settings.lyricFontSize, weight: .bold))
-                        .foregroundColor(.white)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.7)
-                        .frame(maxWidth: .infinity)
+            if isOneLineMode {
+                // One-line mode: main lyric on top, background vocal below
+                VStack {
+                    Spacer()
+                    
+                    if let lyric = audioPlayer.oneLineModeLyric {
+                        VStack(spacing: 8) {
+                            // Main lyric (top, bold, all caps)
+                            Text(lyric.mainText.uppercased())
+                                .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.1))
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.5)
+                            
+                            // Background vocal (bottom, smaller, dimmer)
+                            if let background = lyric.backgroundText {
+                                Text(background.uppercased())
+                                    .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.7))
+                                    .foregroundColor(.white.opacity(0.5))
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
+                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            }
+                        }
                         .padding(.horizontal, 60)
-                        .id("current-\(audioPlayer.currentLyricIndex)")
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .offset(y: 15)),
-                            removal: .opacity.combined(with: .offset(y: -15))
-                        ))
+                        .id(lyric.displayId)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    }
+                    
+                    Spacer()
                 }
-                
-                // Future lyrics (gray, progressively fading)
-                ForEach(1...visibleFutureLines, id: \.self) { offset in
-                    let index = audioPlayer.currentLyricIndex + offset
-                    if index >= 0 && index < audioPlayer.lyrics.count {
-                        let opacity = 0.35 - Double(offset - 1) * 0.1
-                        
-                        Text(audioPlayer.lyrics[index].text)
-                            .font(.system(size: settings.lyricFontSize * 0.75, weight: .medium))
-                            .foregroundColor(.white.opacity(max(0.06, opacity)))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .animation(.easeOut(duration: 0.2), value: audioPlayer.oneLineModeLyric?.displayId)
+            } else {
+                VStack(spacing: lineSpacing) {
+                    // Current lyric (bright, bold)
+                    if audioPlayer.currentLyricIndex >= 0 && audioPlayer.currentLyricIndex < audioPlayer.lyrics.count {
+                        Text(audioPlayer.lyrics[audioPlayer.currentLyricIndex].text)
+                            .font(.system(size: settings.lyricFontSize, weight: .bold))
+                            .foregroundColor(.white)
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
                             .minimumScaleFactor(0.7)
                             .frame(maxWidth: .infinity)
                             .padding(.horizontal, 60)
-                            .id("future-\(index)")
+                            .id("current-\(audioPlayer.currentLyricIndex)")
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .offset(y: 15)),
+                                removal: .opacity.combined(with: .offset(y: -15))
+                            ))
+                    }
+                
+                    // Future lyrics (gray, progressively fading)
+                    ForEach(1...visibleFutureLines, id: \.self) { offset in
+                        let index = audioPlayer.currentLyricIndex + offset
+                        if index >= 0 && index < audioPlayer.lyrics.count {
+                            let opacity = 0.35 - Double(offset - 1) * 0.1
+                            
+                            Text(audioPlayer.lyrics[index].text)
+                                .font(.system(size: settings.lyricFontSize * 0.75, weight: .medium))
+                                .foregroundColor(.white.opacity(max(0.06, opacity)))
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.7)
+                                .frame(maxWidth: .infinity)
+                                .padding(.horizontal, 60)
+                                .id("future-\(index)")
+                        }
                     }
                 }
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: audioPlayer.currentLyricIndex)
             }
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: audioPlayer.currentLyricIndex)
         } else {
             Image(systemName: "text.quote")
                 .font(.system(size: 48, weight: .ultraLight))

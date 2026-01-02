@@ -162,6 +162,39 @@ struct SettingsPanelView: View {
                                 }
                             }
                         }
+                        
+                        // Visualizer Section
+                        SettingsSection(title: "Visualizer") {
+                            VStack(spacing: 12) {
+                                SettingsToggle(title: "Show Visualizer", isOn: $settings.showVisualizer)
+                                
+                                if settings.showVisualizer {
+                                    SettingsSlider(
+                                        title: "Bar Width",
+                                        value: $settings.visualizerBarWidth,
+                                        range: 2...12
+                                    )
+                                    
+                                    SettingsIntSlider(
+                                        title: "Bar Count",
+                                        value: $settings.visualizerBarCount,
+                                        range: 8...120
+                                    )
+                                    
+                                    SettingsSlider(
+                                        title: "Bar Gap",
+                                        value: $settings.visualizerBarGap,
+                                        range: 1...10
+                                    )
+                                    
+                                    SettingsSlider(
+                                        title: "Opacity",
+                                        value: $settings.visualizerBarOpacity,
+                                        range: 0.1...1.0
+                                    )
+                                }
+                            }
+                        }
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
@@ -335,6 +368,38 @@ struct SettingsSlider: View {
             
             Slider(value: $value, in: range)
                 .tint(.white.opacity(0.5))
+        }
+    }
+}
+
+struct SettingsIntSlider: View {
+    let title: String
+    @Binding var value: Int
+    let range: ClosedRange<Int>
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.6))
+                
+                Spacer()
+                
+                Text("\(value)")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.35))
+            }
+            
+            Slider(
+                value: Binding(
+                    get: { Double(value) },
+                    set: { value = Int($0) }
+                ),
+                in: Double(range.lowerBound)...Double(range.upperBound),
+                step: 1
+            )
+            .tint(.white.opacity(0.5))
         }
     }
 }

@@ -13,16 +13,65 @@ struct LyricsView: View {
         GeometryReader { geo in
             ZStack {
                 if audioPlayer.hasLyrics {
-                    SmoothLyricsView(containerHeight: geo.size.height)
-            } else {
-                // Minimal empty state
-                Image(systemName: "text.quote")
-                    .font(.system(size: 48, weight: .ultraLight))
-                    .foregroundColor(Color.white.opacity(0.1))
-            }
+                    if settings.lyricLinesVisible == 1 {
+                        // One-line mode: single centered lyric in Mollen Bold, all caps
+                        OneLineLyricView()
+                    } else {
+                        SmoothLyricsView(containerHeight: geo.size.height)
+                    }
+                } else {
+                    // Minimal empty state
+                    Image(systemName: "text.quote")
+                        .font(.system(size: 48, weight: .ultraLight))
+                        .foregroundColor(Color.white.opacity(0.1))
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+}
+
+// MARK: - One Line Lyric View (Minimal mode)
+
+struct OneLineLyricView: View {
+    @EnvironmentObject var audioPlayer: AudioPlayerManager
+    @EnvironmentObject var settings: SettingsManager
+    
+    var body: some View {
+        VStack {
+            Spacer()
+            
+            if let lyric = audioPlayer.oneLineModeLyric {
+                VStack(spacing: 8) {
+                    // Main lyric (top, bold, all caps)
+                    Text(lyric.mainText.uppercased())
+                        .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.1))
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.6)
+                    
+                    // Background vocal (bottom, smaller, dimmer)
+                    if let background = lyric.backgroundText {
+                        Text(background.uppercased())
+                            .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.7))
+                            .foregroundColor(.white.opacity(0.5))
+                            .multilineTextAlignment(.center)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+                }
+                .padding(.horizontal, 40)
+                .id(lyric.displayId)
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
+            
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(.easeOut(duration: 0.2), value: audioPlayer.oneLineModeLyric?.displayId)
     }
 }
 
