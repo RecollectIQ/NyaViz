@@ -10,9 +10,23 @@ struct Lyric: Identifiable, Equatable {
     let startTime: TimeInterval
     let endTime: TimeInterval
     let text: String
+    /// Secondary line (e.g., translation in parentheses) that shares the same timestamp
+    let secondaryText: String?
+    
+    init(startTime: TimeInterval, endTime: TimeInterval, text: String, secondaryText: String? = nil) {
+        self.startTime = startTime
+        self.endTime = endTime
+        self.text = text
+        self.secondaryText = secondaryText
+    }
     
     var duration: TimeInterval {
         endTime - startTime
+    }
+    
+    /// Whether this lyric has a paired translation/secondary line
+    var hasPairedLine: Bool {
+        secondaryText != nil
     }
 }
 
@@ -65,7 +79,66 @@ struct SRTParser {
             }
         }
         
-        return lyrics.sorted { $0.startTime < $1.startTime }
+        // Sort by start time first
+        let sortedLyrics = lyrics.sorted { $0.startTime < $1.startTime }
+        
+        // Merge lyrics with identical timestamps
+        // When two consecutive lyrics have the same start and end time,
+        // combine them: main lyric on top, secondary (parenthetical) below
+        var mergedLyrics: [Lyric] = []
+        var i = 0
+        
+        while i < sortedLyrics.count {
+            let current = sortedLyrics[i]
+            
+            // Look ahead for a lyric with matching timestamps
+            if i + 1 < sortedLyrics.count {
+                let next = sortedLyrics[i + 1]
+                
+                // Check if timestamps match (within tiny tolerance for floating point)
+                let sameStart = abs(current.startTime - next.startTime) < 0.01
+                let sameEnd = abs(current.endTime - next.endTime) < 0.01
+                
+                if sameStart && sameEnd {
+                    // Determine which is main and which is secondary
+                    let currentIsParenthetical = current.text.trimmingCharacters(in: .whitespaces).hasPrefix("(")
+                    let nextIsParenthetical = next.text.trimmingCharacters(in: .whitespaces).hasPrefix("(")
+                    
+                    let mainText: String
+                    let secondaryText: String
+                    
+                    if currentIsParenthetical && !nextIsParenthetical {
+                        // Current is secondary, next is main
+                        mainText = next.text
+                        secondaryText = current.text
+                    } else if !currentIsParenthetical && nextIsParenthetical {
+                        // Current is main, next is secondary
+                        mainText = current.text
+                        secondaryText = next.text
+                    } else {
+                        // Both same type - first is main, second is secondary
+                        mainText = current.text
+                        secondaryText = next.text
+                    }
+                    
+                    mergedLyrics.append(Lyric(
+                        startTime: current.startTime,
+                        endTime: current.endTime,
+                        text: mainText,
+                        secondaryText: secondaryText
+                    ))
+                    
+                    i += 2 // Skip both lyrics
+                    continue
+                }
+            }
+            
+            // No merge - add as single lyric
+            mergedLyrics.append(current)
+            i += 1
+        }
+        
+        return mergedLyrics
     }
     
     private static func parseTimestamp(_ string: String) -> TimeInterval? {

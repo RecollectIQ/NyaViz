@@ -139,14 +139,15 @@ struct FullScreenSmoothLyrics: View {
     
     let containerHeight: CGFloat
     
-    private let lineSpacing: CGFloat = 20
+    private let lineSpacing: CGFloat = 24
     
     private var fontSize: CGFloat {
         settings.lyricFontSize * 1.2
     }
     
     private var lineHeight: CGFloat {
-        fontSize * 1.4
+        // Account for potential secondary line (translation)
+        fontSize * 2.0
     }
     
     private var totalLineHeight: CGFloat {
@@ -164,15 +165,17 @@ struct FullScreenSmoothLyrics: View {
             ForEach(-visibleRange...visibleRange, id: \.self) { offset in
                 let index = audioPlayer.currentLyricIndex + offset
                 if index >= 0 && index < audioPlayer.lyrics.count {
+                    let lyric = audioPlayer.lyrics[index]
                     let relativeOffset = CGFloat(offset) - (smoothIndex - CGFloat(audioPlayer.currentLyricIndex))
                     
                     FullScreenLyricLine(
-                        text: audioPlayer.lyrics[index].text,
+                        text: lyric.text,
+                        secondaryText: lyric.secondaryText,
                         relativePosition: relativeOffset,
                         fontSize: fontSize,
                         maxDistance: CGFloat(visibleRange)
                     )
-                    .frame(height: lineHeight)
+                    .frame(minHeight: lineHeight)
                     .offset(y: relativeOffset * totalLineHeight)
                 }
             }
@@ -193,6 +196,7 @@ struct FullScreenSmoothLyrics: View {
 
 struct FullScreenLyricLine: View {
     let text: String
+    let secondaryText: String?
     let relativePosition: CGFloat
     let fontSize: CGFloat
     let maxDistance: CGFloat
@@ -222,15 +226,28 @@ struct FullScreenLyricLine: View {
     }
     
     var body: some View {
-        Text(text)
-            .font(.system(size: isActive ? fontSize * 1.08 : fontSize * 0.85, weight: isActive ? .heavy : .bold, design: .default))
-            .multilineTextAlignment(.center)
-            .lineLimit(2)
-            .minimumScaleFactor(0.7)
-            .foregroundColor(.white.opacity(opacity))
-            .scaleEffect(scale)
-            .blur(radius: blur)
-            .frame(maxWidth: .infinity)
+        VStack(spacing: 6) {
+            // Main lyric
+            Text(text)
+                .font(.system(size: isActive ? fontSize * 1.08 : fontSize * 0.85, weight: isActive ? .heavy : .bold, design: .default))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
+                .foregroundColor(.white.opacity(opacity))
+            
+            // Secondary lyric (translation) - slightly smaller and dimmer
+            if let secondary = secondaryText {
+                Text(secondary)
+                    .font(.system(size: isActive ? fontSize * 0.8 : fontSize * 0.65, weight: isActive ? .semibold : .medium, design: .default))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .foregroundColor(.white.opacity(opacity * 0.6))
+            }
+        }
+        .scaleEffect(scale)
+        .blur(radius: blur)
+        .frame(maxWidth: .infinity)
     }
 }
 

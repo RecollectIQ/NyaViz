@@ -45,6 +45,7 @@ class AudioPlayerManager: ObservableObject {
     private var imaginaryPart: [Float] = []
     private var window: [Float] = []
     private var smoothedBands: [Float] = Array(repeating: 0, count: 128)
+    private var lastBandsUpdateTime: CFAbsoluteTime = 0
     
     private var timer: Timer?
     private var cancellables = Set<AnyCancellable>()
@@ -271,35 +272,33 @@ class AudioPlayerManager: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
             guard self != nil else { return }
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                guard let self, self.isPlaying else { return }
                 
-                if self.isPlaying {
-                    // Update current time based on player position + seek offset
-                    if let player = self.playerNode, let nodeTime = player.lastRenderTime,
-                       let playerTime = player.playerTime(forNodeTime: nodeTime) {
-                        let sampleRate = self.audioFile?.processingFormat.sampleRate ?? 44100
-                        let playerSeconds = Double(playerTime.sampleTime) / sampleRate
-                        
-                        // Add the seek offset to get absolute time in file
-                        let calculatedTime = self.seekOffset + playerSeconds
-                        
-                        // Only update if the calculated time is valid (non-negative)
-                        // Negative times can occur briefly when player just started due to latency
-                        if calculatedTime >= 0 {
-                            self.currentTime = calculatedTime
-                        }
-                        
-                        // Handle end of track
-                        if self.currentTime >= self.duration {
-                            if self.isLooping {
-                                self.currentTime = 0
-                                self.seekOffset = 0
-                            }
-                        }
+                // Update current time based on player position + seek offset
+                if let player = self.playerNode, let nodeTime = player.lastRenderTime,
+                   let playerTime = player.playerTime(forNodeTime: nodeTime) {
+                    let sampleRate = self.audioFile?.processingFormat.sampleRate ?? 44100
+                    let playerSeconds = Double(playerTime.sampleTime) / sampleRate
+                    
+                    // Add the seek offset to get absolute time in file
+                    let calculatedTime = self.seekOffset + playerSeconds
+                    
+                    // Only update if the calculated time is valid and has changed meaningfully
+                    // This reduces unnecessary @Published updates
+                    if calculatedTime >= 0 && abs(calculatedTime - self.currentTime) > 0.001 {
+                        self.currentTime = calculatedTime
                     }
                     
-                    self.updateCurrentLyric()
+                    // Handle end of track
+                    if self.currentTime >= self.duration {
+                        if self.isLooping {
+                            self.currentTime = 0
+                            self.seekOffset = 0
+                        }
+                    }
                 }
+                
+                self.updateCurrentLyric()
             }
         }
     }
@@ -407,9 +406,14 @@ class AudioPlayerManager: ObservableObject {
                     }
                 }
                 
-                let resultBands = self.smoothedBands
-                Task { @MainActor [weak self] in
-                    self?.frequencyBands = resultBands
+                // Throttle UI updates to ~60fps to avoid "Publishing changes from within view updates" warnings
+                let now = CFAbsoluteTimeGetCurrent()
+                if now - self.lastBandsUpdateTime >= 0.016 {
+                    self.lastBandsUpdateTime = now
+                    let resultBands = self.smoothedBands
+                    Task { @MainActor [weak self] in
+                        self?.frequencyBands = resultBands
+                    }
                 }
             }
         }
@@ -423,17 +427,25 @@ class AudioPlayerManager: ObservableObject {
             if currentLyricIndex != index {
                 currentLyricIndex = index
             }
-            isWithinLyricTimeRange = true
+            if !isWithinLyricTimeRange {
+                isWithinLyricTimeRange = true
+            }
         } else if let index = lyrics.lastIndex(where: { time >= $0.startTime }) {
             // Fallback for normal mode: show last started lyric
             if currentLyricIndex != index {
                 currentLyricIndex = index
             }
             // But we're not within the time range anymore
-            isWithinLyricTimeRange = false
+            if isWithinLyricTimeRange {
+                isWithinLyricTimeRange = false
+            }
         } else {
-            currentLyricIndex = -1
-            isWithinLyricTimeRange = false
+            if currentLyricIndex != -1 {
+                currentLyricIndex = -1
+            }
+            if isWithinLyricTimeRange {
+                isWithinLyricTimeRange = false
+            }
         }
     }
     
@@ -453,16 +465,13 @@ class AudioPlayerManager: ObservableObject {
     }
     
     /// Returns the current merged lyric for one-line mode
-    /// Main lyrics appear on top, parenthetical background vocals appear below
+    /// Main lyrics appear on top, secondary text (translation) appears below
     /// Filters out lyrics shorter than minLyricDuration to prevent flickering
     var oneLineModeLyric: MergedLyric? {
         let time = currentTime
         
-        // Find all lyrics currently active at this time (with minimum duration)
-        var mainLyric: String? = nil
-        var backgroundLyric: String? = nil
-        var mainEndTime: TimeInterval = 0
-        
+        // Find the current lyric at this time (with minimum duration)
+        // Lyrics are now pre-merged with secondaryText at parse time
         for lyric in lyrics {
             guard time >= lyric.startTime && time < lyric.endTime else { continue }
             
@@ -470,70 +479,28 @@ class AudioPlayerManager: ObservableObject {
             let duration = lyric.endTime - lyric.startTime
             guard duration >= Self.minLyricDuration else { continue }
             
-            let trimmed = lyric.text.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("(") && trimmed.hasSuffix(")") {
-                // This is a background vocal
-                if backgroundLyric == nil {
-                    backgroundLyric = trimmed
-                }
-            } else {
-                // This is a main lyric
-                if mainLyric == nil {
-                    mainLyric = lyric.text
-                    mainEndTime = lyric.endTime
-                }
-            }
+            // Return the lyric with its pre-merged secondary text
+            return MergedLyric(mainText: lyric.text, backgroundText: lyric.secondaryText)
         }
         
-        // If we found a main lyric, return it with any background
-        if let main = mainLyric {
-            return MergedLyric(mainText: main, backgroundText: backgroundLyric)
-        }
-        
-        // If only background vocal is active, look for a recent main lyric to extend
-        // (within 1 second of its end time)
-        if backgroundLyric != nil {
-            var lastMainLyric: Lyric? = nil
-            for lyric in lyrics {
-                guard lyric.startTime <= time else { break }
-                let duration = lyric.endTime - lyric.startTime
-                guard duration >= Self.minLyricDuration else { continue }
-                
-                let trimmed = lyric.text.trimmingCharacters(in: .whitespaces)
-                if !trimmed.hasPrefix("(") {
-                    lastMainLyric = lyric
-                }
-            }
-            
-            if let last = lastMainLyric, time < last.endTime + 1.0 {
-                return MergedLyric(mainText: last.text, backgroundText: backgroundLyric)
-            }
-        }
-        
-        // Check if we should extend a previous main lyric (to bridge short gaps)
-        var lastMainLyric: Lyric? = nil
+        // Check if we should extend a previous lyric (to bridge short gaps)
+        var lastLyric: Lyric? = nil
         for lyric in lyrics {
             guard lyric.startTime <= time else { break }
             let duration = lyric.endTime - lyric.startTime
             guard duration >= Self.minLyricDuration else { continue }
-            
-            let trimmed = lyric.text.trimmingCharacters(in: .whitespaces)
-            if !trimmed.hasPrefix("(") {
-                lastMainLyric = lyric
-            }
+            lastLyric = lyric
         }
         
-        if let last = lastMainLyric, time < last.endTime + 0.5 {
-            // Check if there's a gap before the next valid main lyric
-            let nextMainStart = lyrics.first(where: { lyric in
+        if let last = lastLyric, time < last.endTime + 0.5 {
+            // Check if there's a gap before the next valid lyric
+            let nextStart = lyrics.first(where: { lyric in
                 let duration = lyric.endTime - lyric.startTime
-                return lyric.startTime > last.endTime &&
-                       duration >= Self.minLyricDuration &&
-                       !lyric.text.trimmingCharacters(in: .whitespaces).hasPrefix("(")
+                return lyric.startTime > last.endTime && duration >= Self.minLyricDuration
             })?.startTime ?? .infinity
             
-            if time < nextMainStart {
-                return MergedLyric(mainText: last.text, backgroundText: nil)
+            if time < nextStart {
+                return MergedLyric(mainText: last.text, backgroundText: last.secondaryText)
             }
         }
         
