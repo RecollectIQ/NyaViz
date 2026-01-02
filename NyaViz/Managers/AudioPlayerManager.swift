@@ -31,6 +31,12 @@ class AudioPlayerManager: ObservableObject {
     private var audioFile: AVAudioFile?
     private var audioFileURL: URL?
     
+    // Track the seek offset for accurate time calculation
+    private var seekOffset: TimeInterval = 0
+    
+    // Generation counter to invalidate old completion handlers after seek/reschedule
+    private var scheduleGeneration: Int = 0
+    
     // FFT setup
     private var fftSetup: FFTSetup?
     private let fftSize: Int = 2048
@@ -137,7 +143,7 @@ class AudioPlayerManager: ObservableObject {
             }
         }
         
-        // Schedule the file from current position
+        // Schedule the file from current position (scheduleAudio sets seekOffset)
         scheduleAudio(from: currentTime)
         player.play()
         
@@ -146,6 +152,10 @@ class AudioPlayerManager: ObservableObject {
     }
     
     private func scheduleAudio(from time: TimeInterval) {
+        // Increment generation to invalidate any pending completion handlers
+        scheduleGeneration += 1
+        let currentGeneration = scheduleGeneration
+        
         guard let player = playerNode, let file = audioFile else { return }
         
         player.stop()
@@ -157,13 +167,23 @@ class AudioPlayerManager: ObservableObject {
         
         guard frameCount > 0, startFrame < totalFrames else { return }
         
+        // Update seekOffset to match the scheduled time
+        seekOffset = time
+        
         if isLooping {
             // Schedule current segment, then set up completion handler for looping
             player.scheduleSegment(file, startingFrame: startFrame, frameCount: frameCount, at: nil) { [weak self] in
                 guard let self else { return }
                 Task { @MainActor [weak self] in
-                    guard let self, self.isLooping, self.isPlaying else { return }
+                    guard let self else { return }
+                    
+                    // Only loop if this completion handler is for the CURRENT schedule
+                    // If we've rescheduled (seek), the generation won't match and we should ignore
+                    guard currentGeneration == self.scheduleGeneration else { return }
+                    guard self.isLooping, self.isPlaying else { return }
+                    
                     self.currentTime = 0
+                    self.seekOffset = 0
                     self.scheduleAudio(from: 0)
                     self.playerNode?.play()
                 }
@@ -172,8 +192,10 @@ class AudioPlayerManager: ObservableObject {
             player.scheduleSegment(file, startingFrame: startFrame, frameCount: frameCount, at: nil) { [weak self] in
                 guard self != nil else { return }
                 Task { @MainActor [weak self] in
-                    self?.isPlaying = false
-                    self?.stopTimer()
+                    guard let self else { return }
+                    guard currentGeneration == self.scheduleGeneration else { return }
+                    self.isPlaying = false
+                    self.stopTimer()
                 }
             }
         }
@@ -200,6 +222,7 @@ class AudioPlayerManager: ObservableObject {
         
         isPlaying = false
         currentTime = 0
+        seekOffset = 0  // Reset offset
         stopTimer()
         
         // Reset frequency bands
@@ -223,6 +246,7 @@ class AudioPlayerManager: ObservableObject {
         }
         
         currentTime = max(0, min(time, duration))
+        seekOffset = currentTime
         updateCurrentLyric()
         
         if wasPlaying {
@@ -250,15 +274,27 @@ class AudioPlayerManager: ObservableObject {
                 guard let self else { return }
                 
                 if self.isPlaying {
-                    // Update current time based on player position
+                    // Update current time based on player position + seek offset
                     if let player = self.playerNode, let nodeTime = player.lastRenderTime,
                        let playerTime = player.playerTime(forNodeTime: nodeTime) {
                         let sampleRate = self.audioFile?.processingFormat.sampleRate ?? 44100
-                        self.currentTime = Double(playerTime.sampleTime) / sampleRate
+                        let playerSeconds = Double(playerTime.sampleTime) / sampleRate
                         
-                        // Handle looping time wrap
-                        if self.currentTime < 0 {
-                            self.currentTime = 0
+                        // Add the seek offset to get absolute time in file
+                        let calculatedTime = self.seekOffset + playerSeconds
+                        
+                        // Only update if the calculated time is valid (non-negative)
+                        // Negative times can occur briefly when player just started due to latency
+                        if calculatedTime >= 0 {
+                            self.currentTime = calculatedTime
+                        }
+                        
+                        // Handle end of track
+                        if self.currentTime >= self.duration {
+                            if self.isLooping {
+                                self.currentTime = 0
+                                self.seekOffset = 0
+                            }
                         }
                     }
                     
