@@ -9,21 +9,57 @@ import SwiftUI
 import AppKit
 import Combine
 
+// MARK: - Export Options
+
+struct ExportOptions {
+    enum Resolution: String, CaseIterable {
+        case r2160p = "4K (3840×2160)"
+        case r1080p = "1080p (1920×1080)"
+        case r720p = "720p (1280×720)"
+        case r480p = "480p (854×480)"
+        
+        var width: Int {
+            switch self {
+            case .r2160p: return 3840
+            case .r1080p: return 1920
+            case .r720p: return 1280
+            case .r480p: return 854
+            }
+        }
+        
+        var height: Int {
+            switch self {
+            case .r2160p: return 2160
+            case .r1080p: return 1080
+            case .r720p: return 720
+            case .r480p: return 480
+            }
+        }
+    }
+    
+    var resolution: Resolution = .r1080p
+    var includeVisualizer: Bool = true
+    var includeParticles: Bool = true
+    var frameRate: Double = 30
+}
+
 @MainActor
 class VideoExporter: ObservableObject {
     @Published var isExporting = false
     @Published var progress: Double = 0
     @Published var statusMessage: String = ""
+    @Published var showExportOptions = false
+    @Published var exportOptions = ExportOptions()
     
     private var assetWriter: AVAssetWriter?
     private var videoInput: AVAssetWriterInput?
     private var audioInput: AVAssetWriterInput?
     private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
     
-    // Export settings - optimized for speed
-    let frameRate: Double = 30
-    let videoWidth: Int = 1920
-    let videoHeight: Int = 1080
+    // These will be set from exportOptions
+    private var frameRate: Double = 30
+    private var videoWidth: Int = 1920
+    private var videoHeight: Int = 1080
     
     // Frame cache for duplicate detection
     private var lastRenderedLyricIndex: Int = -999
@@ -52,7 +88,76 @@ class VideoExporter: ObservableObject {
         }
     }
     
-    /// Shows save panel and exports video to selected location
+    /// Shows export options sheet, then save panel, then exports
+    func showExportOptionsAndExport(
+        audioPlayer: AudioPlayerManager,
+        settings: SettingsManager,
+        completion: @escaping (Result<URL, Error>) -> Void
+    ) {
+        self.pendingCompletion = completion
+        self.pendingAudioPlayer = audioPlayer
+        self.pendingSettings = settings
+        self.showExportOptions = true
+    }
+    
+    // Stored references for after options are confirmed
+    private var pendingCompletion: ((Result<URL, Error>) -> Void)?
+    private var pendingAudioPlayer: AudioPlayerManager?
+    private var pendingSettings: SettingsManager?
+    
+    /// Called when user confirms export options
+    func confirmExport() {
+        guard let completion = pendingCompletion,
+              let audioPlayer = pendingAudioPlayer,
+              let settings = pendingSettings else { return }
+        
+        showExportOptions = false
+        
+        // Apply export options
+        videoWidth = exportOptions.resolution.width
+        videoHeight = exportOptions.resolution.height
+        frameRate = exportOptions.frameRate
+        
+        // Show save panel
+        let savePanel = NSSavePanel()
+        savePanel.title = "Export Video"
+        savePanel.nameFieldStringValue = "\(audioPlayer.audioFileName).mp4"
+        savePanel.allowedContentTypes = [.mpeg4Movie]
+        savePanel.canCreateDirectories = true
+        
+        savePanel.begin { [weak self] response in
+            guard let self = self else { return }
+            
+            if response == .OK, let url = savePanel.url {
+                Task { @MainActor in
+                    do {
+                        try await self.performExport(
+                            to: url,
+                            audioPlayer: audioPlayer,
+                            settings: settings,
+                            options: self.exportOptions
+                        )
+                        completion(.success(url))
+                    } catch {
+                        completion(.failure(error))
+                    }
+                }
+            }
+        }
+        
+        pendingCompletion = nil
+        pendingAudioPlayer = nil
+        pendingSettings = nil
+    }
+    
+    func cancelExport() {
+        showExportOptions = false
+        pendingCompletion = nil
+        pendingAudioPlayer = nil
+        pendingSettings = nil
+    }
+    
+    /// Direct export without options (legacy)
     func exportVideo(
         audioPlayer: AudioPlayerManager,
         settings: SettingsManager,
@@ -73,7 +178,8 @@ class VideoExporter: ObservableObject {
                         try await self.performExport(
                             to: url,
                             audioPlayer: audioPlayer,
-                            settings: settings
+                            settings: settings,
+                            options: self.exportOptions
                         )
                         completion(.success(url))
                     } catch {
@@ -88,8 +194,13 @@ class VideoExporter: ObservableObject {
     private func performExport(
         to outputURL: URL,
         audioPlayer: AudioPlayerManager,
-        settings: SettingsManager
+        settings: SettingsManager,
+        options: ExportOptions = ExportOptions()
     ) async throws {
+        // Apply options
+        videoWidth = options.resolution.width
+        videoHeight = options.resolution.height
+        frameRate = options.frameRate
         print("[VideoExporter] Starting export to: \(outputURL.path)")
         
         guard let audioFileURL = audioPlayer.currentAudioFileURL else {
@@ -209,7 +320,7 @@ class VideoExporter: ObservableObject {
         let capturedLyrics = audioPlayer.lyrics
         let capturedDuration = durationSeconds
         let capturedFileName = audioPlayer.audioFileName
-        let capturedSettings = CapturedSettings(from: settings)
+        let capturedSettings = CapturedSettings(from: settings, options: options)
         let capturedBackgroundImage = settings.backgroundImage
         let capturedVideoInput = videoInput!
         let capturedAdaptor = pixelBufferAdaptor!
@@ -643,15 +754,16 @@ struct CapturedSettings: Sendable {
     let visualizerBarOpacity: Double
     
     @MainActor
-    init(from settings: SettingsManager) {
+    init(from settings: SettingsManager, options: ExportOptions) {
         self.backgroundOpacity = settings.backgroundOpacity
         self.backgroundBlur = settings.backgroundBlur
         self.showTrackTitle = settings.showTrackTitle
-        self.showParticles = settings.showParticles
+        // Use export options to override visualizer/particles
+        self.showParticles = settings.showParticles && options.includeParticles
         self.particleDensity = settings.particleDensity
         self.lyricFontSize = settings.lyricFontSize
         self.lyricLinesVisible = settings.lyricLinesVisible
-        self.showVisualizer = settings.showVisualizer
+        self.showVisualizer = settings.showVisualizer && options.includeVisualizer
         self.visualizerBarWidth = settings.visualizerBarWidth
         self.visualizerBarCount = settings.visualizerBarCount
         self.visualizerBarGap = settings.visualizerBarGap

@@ -378,6 +378,9 @@ struct FloatingControlsView: View {
         } message: {
             Text(exportMessage)
         }
+        .sheet(isPresented: $videoExporter.showExportOptions) {
+            ExportOptionsSheet(videoExporter: videoExporter)
+        }
     }
     
     private func startExport() {
@@ -386,7 +389,7 @@ struct FloatingControlsView: View {
             audioPlayer.pause()
         }
         
-        videoExporter.exportVideo(
+        videoExporter.showExportOptionsAndExport(
             audioPlayer: audioPlayer,
             settings: settings
         ) { result in
@@ -401,6 +404,151 @@ struct FloatingControlsView: View {
                 showExportAlert = true
             }
         }
+    }
+}
+
+// MARK: - Export Options Sheet
+
+struct ExportOptionsSheet: View {
+    @ObservedObject var videoExporter: VideoExporter
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Export Options")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                Spacer()
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .padding(.bottom, 20)
+            
+            Divider()
+                .background(Color.white.opacity(0.1))
+            
+            // Options
+            VStack(spacing: 20) {
+                // Resolution picker - use menu style for better fit
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Resolution")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.6))
+                    
+                    HStack(spacing: 8) {
+                        ForEach(ExportOptions.Resolution.allCases, id: \.self) { res in
+                            ResolutionButton(
+                                resolution: res,
+                                isSelected: videoExporter.exportOptions.resolution == res
+                            ) {
+                                videoExporter.exportOptions.resolution = res
+                            }
+                        }
+                    }
+                }
+                
+                Divider()
+                    .background(Color.white.opacity(0.1))
+                
+                // Visualizer toggle
+                Toggle(isOn: $videoExporter.exportOptions.includeVisualizer) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Include Audio Visualizer")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white)
+                        Text("Shows frequency bars at bottom")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(.blue)
+                
+                // Particles toggle
+                Toggle(isOn: $videoExporter.exportOptions.includeParticles) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Include Snow Particles")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white)
+                        Text("Animated falling particles")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(.blue)
+            }
+            .padding(24)
+            
+            Spacer()
+            
+            Divider()
+                .background(Color.white.opacity(0.1))
+            
+            // Buttons
+            HStack(spacing: 12) {
+                Button("Cancel") {
+                    videoExporter.cancelExport()
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.white.opacity(0.7))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(8)
+                
+                Button("Export") {
+                    videoExporter.confirmExport()
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(Color.blue)
+                .cornerRadius(8)
+            }
+            .padding(24)
+        }
+        .frame(width: 420, height: 400)
+        .background(Color(hex: "1a1a1a"))
+    }
+}
+
+struct ResolutionButton: View {
+    let resolution: ExportOptions.Resolution
+    let isSelected: Bool
+    let action: () -> Void
+    
+    private var shortLabel: String {
+        switch resolution {
+        case .r2160p: return "4K"
+        case .r1080p: return "1080p"
+        case .r720p: return "720p"
+        case .r480p: return "480p"
+        }
+    }
+    
+    private var sizeLabel: String {
+        "\(resolution.width)×\(resolution.height)"
+    }
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                Text(shortLabel)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(isSelected ? .white : .white.opacity(0.6))
+                Text(sizeLabel)
+                    .font(.system(size: 9))
+                    .foregroundColor(isSelected ? .white.opacity(0.7) : .white.opacity(0.4))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(isSelected ? Color.blue : Color.white.opacity(0.08))
+            .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
     }
 }
 
