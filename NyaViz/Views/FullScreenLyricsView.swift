@@ -256,58 +256,151 @@ struct FullScreenLyricLine: View {
 struct FloatingControlsView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
+    @StateObject private var videoExporter = VideoExporter()
+    @State private var showExportAlert = false
+    @State private var exportMessage = ""
+    @State private var exportSuccess = false
     
     var body: some View {
-        HStack(spacing: 20) {
-            // Loop
-            Button(action: { audioPlayer.toggleLoop() }) {
-                Image(systemName: audioPlayer.isLooping ? "repeat.1" : "repeat")
-                    .font(.system(size: 14))
-                    .foregroundColor(audioPlayer.isLooping ? .white : .white.opacity(0.5))
-            }
-            .buttonStyle(.plain)
-            
-            // Seek back
-            Button(action: { audioPlayer.seekBackward(10) }) {
-                Image(systemName: "gobackward.10")
-                    .font(.system(size: 18))
-                    .foregroundColor(.white.opacity(0.5))
-            }
-            .buttonStyle(.plain)
-            
-            // Play/Pause
-            Button(action: { audioPlayer.togglePlayPause() }) {
-                ZStack {
-                    Circle()
-                        .fill(.white)
-                        .frame(width: 44, height: 44)
+        VStack(spacing: 12) {
+            // Export progress indicator
+            if videoExporter.isExporting {
+                VStack(spacing: 8) {
+                    Text(videoExporter.statusMessage)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
                     
-                    Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(.black)
-                        .offset(x: audioPlayer.isPlaying ? 0 : 2)
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.white.opacity(0.2))
+                                .frame(height: 4)
+                            
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.white)
+                                .frame(width: geo.size.width * videoExporter.progress, height: 4)
+                        }
+                    }
+                    .frame(width: 200, height: 4)
+                    
+                    Text("\(Int(videoExporter.progress * 100))%")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.5))
                 }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.black.opacity(0.6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        )
+                )
             }
-            .buttonStyle(.plain)
             
-            // Seek forward
-            Button(action: { audioPlayer.seekForward(10) }) {
-                Image(systemName: "goforward.10")
-                    .font(.system(size: 18))
-                    .foregroundColor(.white.opacity(0.5))
+            // Main controls
+            HStack(spacing: 20) {
+                // Loop
+                Button(action: { audioPlayer.toggleLoop() }) {
+                    Image(systemName: audioPlayer.isLooping ? "repeat.1" : "repeat")
+                        .font(.system(size: 14))
+                        .foregroundColor(audioPlayer.isLooping ? .white : .white.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+                .disabled(videoExporter.isExporting)
+                
+                // Seek back
+                Button(action: { audioPlayer.seekBackward(10) }) {
+                    Image(systemName: "gobackward.10")
+                        .font(.system(size: 18))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+                .disabled(videoExporter.isExporting)
+                
+                // Play/Pause
+                Button(action: { audioPlayer.togglePlayPause() }) {
+                    ZStack {
+                        Circle()
+                            .fill(.white)
+                            .frame(width: 44, height: 44)
+                        
+                        Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.black)
+                            .offset(x: audioPlayer.isPlaying ? 0 : 2)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(videoExporter.isExporting)
+                
+                // Seek forward
+                Button(action: { audioPlayer.seekForward(10) }) {
+                    Image(systemName: "goforward.10")
+                        .font(.system(size: 18))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+                .disabled(videoExporter.isExporting)
+                
+                // Divider
+                Rectangle()
+                    .fill(Color.white.opacity(0.2))
+                    .frame(width: 1, height: 20)
+                
+                // Export video button
+                Button(action: { startExport() }) {
+                    Image(systemName: videoExporter.isExporting ? "arrow.clockwise" : "square.and.arrow.up")
+                        .font(.system(size: 14))
+                        .foregroundColor(videoExporter.isExporting ? .white.opacity(0.3) : .white.opacity(0.5))
+                        .rotationEffect(.degrees(videoExporter.isExporting ? 360 : 0))
+                        .animation(videoExporter.isExporting ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: videoExporter.isExporting)
+                }
+                .buttonStyle(.plain)
+                .disabled(videoExporter.isExporting || !audioPlayer.hasAudio)
+                .help("Export video")
+                
+                // Exit fullscreen
+                Button(action: { settings.isFullScreen = false }) {
+                    Image(systemName: "arrow.down.right.and.arrow.up.left")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+                .disabled(videoExporter.isExporting)
             }
-            .buttonStyle(.plain)
-            
-            // Exit fullscreen
-            Button(action: { settings.isFullScreen = false }) {
-                Image(systemName: "arrow.down.right.and.arrow.up.left")
-                    .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.5))
-            }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 12)
+        .alert(exportSuccess ? "Export Complete" : "Export Failed", isPresented: $showExportAlert) {
+            Button("OK") { }
+        } message: {
+            Text(exportMessage)
+        }
+    }
+    
+    private func startExport() {
+        // Pause playback during export
+        if audioPlayer.isPlaying {
+            audioPlayer.pause()
+        }
+        
+        videoExporter.exportVideo(
+            audioPlayer: audioPlayer,
+            settings: settings
+        ) { result in
+            switch result {
+            case .success(let url):
+                exportSuccess = true
+                exportMessage = "Video saved to:\n\(url.lastPathComponent)"
+                showExportAlert = true
+            case .failure(let error):
+                exportSuccess = false
+                exportMessage = error.localizedDescription
+                showExportAlert = true
+            }
+        }
     }
 }
 

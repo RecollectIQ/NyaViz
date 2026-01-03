@@ -525,6 +525,11 @@ class AudioPlayerManager: ObservableObject {
         !lyrics.isEmpty
     }
     
+    /// Public accessor for the current audio file URL (needed for video export)
+    var currentAudioFileURL: URL? {
+        audioFileURL
+    }
+    
     nonisolated deinit {
         if let fftSetup = fftSetup {
             vDSP_destroy_fftsetup(fftSetup)
