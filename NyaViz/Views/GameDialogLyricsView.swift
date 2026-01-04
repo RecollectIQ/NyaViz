@@ -11,13 +11,13 @@ struct GameDialogLyricsView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
     
-    private var currentLyric: String {
-        guard audioPlayer.hasLyrics,
-              audioPlayer.currentLyricIndex >= 0,
-              audioPlayer.currentLyricIndex < audioPlayer.lyrics.count else {
-            return ""
-        }
-        return audioPlayer.lyrics[audioPlayer.currentLyricIndex].text
+    // Use oneLineModeLyric to respect SRT end times (like minimal mode)
+    private var currentLyric: String? {
+        audioPlayer.oneLineModeLyric?.mainText
+    }
+    
+    private var hasCurrentLyric: Bool {
+        currentLyric != nil && !currentLyric!.isEmpty
     }
     
     private var displayName: String {
@@ -69,8 +69,8 @@ struct GameDialogLyricsView: View {
                         
                         // Main dialog box - centered text, dynamic width
                         VStack(spacing: 0) {
-                            if !currentLyric.isEmpty {
-                                Text(currentLyric.uppercased())
+                            if let lyric = currentLyric {
+                                Text(lyric.uppercased())
                                     .font(.custom("MollenTrial-Bold", size: fontSize))
                                     .foregroundColor(.white)
                                     .multilineTextAlignment(.center)
@@ -78,10 +78,10 @@ struct GameDialogLyricsView: View {
                                     .minimumScaleFactor(0.5)
                                     .fixedSize(horizontal: false, vertical: true)
                                     .frame(maxWidth: .infinity)
-                                    .id("dialog-\(audioPlayer.currentLyricIndex)")
+                                    .id("dialog-\(lyric)")
                                     .transition(.opacity)
                             } else {
-                                // Empty state with placeholder
+                                // Empty state with placeholder (when between lyrics or SRT ended)
                                 Text("...")
                                     .font(.custom("MollenTrial-Bold", size: fontSize))
                                     .foregroundColor(.white.opacity(0.3))
@@ -116,7 +116,7 @@ struct GameDialogLyricsView: View {
                 Spacer()
             }
         }
-        .animation(.easeOut(duration: 0.15), value: audioPlayer.currentLyricIndex)
+        .animation(.easeOut(duration: 0.15), value: currentLyric)
     }
 }
 
