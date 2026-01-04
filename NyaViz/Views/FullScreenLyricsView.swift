@@ -29,44 +29,54 @@ struct FullScreenLyricsView: View {
                         .foregroundColor(Color.white.opacity(0.1))
                 }
                 
-                // Track info at top left (if enabled)
+                // Track info at top left (if enabled) - scales with window size
                 if settings.showTrackTitle && !audioPlayer.audioFileName.isEmpty {
+                    let scaleFactor = min(geo.size.width, geo.size.height) / 800
+                    let clampedScale = min(max(scaleFactor, 0.6), 1.5)
+                    let ringSize: CGFloat = 32 * clampedScale
+                    let titleFontSize: CGFloat = 14 * clampedScale
+                    let timeFontSize: CGFloat = 11 * clampedScale
+                    let iconSize: CGFloat = 9 * clampedScale
+                    let strokeWidth: CGFloat = 2 * clampedScale
+                    let spacing: CGFloat = 12 * clampedScale
+                    let padding: CGFloat = 24 * clampedScale
+                    
                     VStack {
-                        HStack(alignment: .center, spacing: 12) {
+                        HStack(alignment: .center, spacing: spacing) {
                             // Progress ring
                             ZStack {
                                 Circle()
-                                    .stroke(Color.white.opacity(0.15), lineWidth: 2)
-                                    .frame(width: 32, height: 32)
+                                    .stroke(Color.white.opacity(0.15), lineWidth: strokeWidth)
+                                    .frame(width: ringSize, height: ringSize)
                                 
                                 Circle()
                                     .trim(from: 0, to: audioPlayer.progress)
-                                    .stroke(Color.white.opacity(0.8), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                                    .frame(width: 32, height: 32)
+                                    .stroke(Color.white.opacity(0.8), style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round))
+                                    .frame(width: ringSize, height: ringSize)
                                     .rotationEffect(.degrees(-90))
                                 
                                 Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                                    .font(.system(size: 9))
+                                    .font(.system(size: iconSize))
                                     .foregroundColor(.white.opacity(0.8))
                             }
                             .onTapGesture {
                                 audioPlayer.togglePlayPause()
                             }
                             
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: 2 * clampedScale) {
                                 Text(audioPlayer.audioFileName)
-                                    .font(.system(size: 14, weight: .medium, design: .default))
+                                    .font(.system(size: titleFontSize, weight: .medium, design: .default))
                                     .foregroundColor(.white.opacity(0.8))
                                 
                                 Text(formatTime(audioPlayer.currentTime) + " / " + formatTime(audioPlayer.duration))
-                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                    .font(.system(size: timeFontSize, weight: .medium, design: .monospaced))
                                     .foregroundColor(.white.opacity(0.4))
                             }
                             
                             Spacer()
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.top, 20)
+                        .padding(.horizontal, padding)
+                        .padding(.top, 20 * clampedScale)
                         
                         Spacer()
                     }
