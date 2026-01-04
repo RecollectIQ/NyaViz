@@ -20,6 +20,10 @@ class SettingsManager: ObservableObject {
         static let particleDensity = "particleDensity"
         static let lyricFontSize = "lyricFontSize"
         static let lyricLinesVisible = "lyricLinesVisible"
+        static let dialogCharacterName = "dialogCharacterName"
+        static let dialogMaxWidth = "dialogMaxWidth"
+        static let dialogMaxHeight = "dialogMaxHeight"
+        static let dialogPosition = "dialogPosition"
         // Visualizer
         static let showVisualizer = "showVisualizer"
         static let visualizerBarWidth = "visualizerBarWidth"
@@ -74,6 +78,21 @@ class SettingsManager: ObservableObject {
     @Published var lyricLinesVisible: Int = 2 {
         didSet { defaults.set(lyricLinesVisible, forKey: Keys.lyricLinesVisible) }
     }
+    
+    // Dialog Mode (game-style conversation overlay)
+    @Published var dialogCharacterName: String = "CHARACTER" {
+        didSet { defaults.set(dialogCharacterName, forKey: Keys.dialogCharacterName) }
+    }
+    @Published var dialogMaxWidth: Double = 0.84 {
+        didSet { defaults.set(dialogMaxWidth, forKey: Keys.dialogMaxWidth) }
+    }
+    @Published var dialogMaxHeight: Double = 0.25 {
+        didSet { defaults.set(dialogMaxHeight, forKey: Keys.dialogMaxHeight) }
+    }
+    @Published var dialogPosition: Double = 0.75 {
+        didSet { defaults.set(dialogPosition, forKey: Keys.dialogPosition) }
+    }
+    @Published var showDialogSettings: Bool = false
     
     // Visualizer
     @Published var showVisualizer: Bool = true {
@@ -144,6 +163,18 @@ class SettingsManager: ObservableObject {
         }
         if defaults.object(forKey: Keys.lyricLinesVisible) != nil {
             lyricLinesVisible = defaults.integer(forKey: Keys.lyricLinesVisible)
+        }
+        if let savedName = defaults.string(forKey: Keys.dialogCharacterName) {
+            dialogCharacterName = savedName
+        }
+        if defaults.object(forKey: Keys.dialogMaxWidth) != nil {
+            dialogMaxWidth = defaults.double(forKey: Keys.dialogMaxWidth)
+        }
+        if defaults.object(forKey: Keys.dialogMaxHeight) != nil {
+            dialogMaxHeight = defaults.double(forKey: Keys.dialogMaxHeight)
+        }
+        if defaults.object(forKey: Keys.dialogPosition) != nil {
+            dialogPosition = defaults.double(forKey: Keys.dialogPosition)
         }
         if defaults.object(forKey: "verticalLayout") != nil {
             verticalLayout = defaults.bool(forKey: "verticalLayout")

@@ -271,9 +271,16 @@ struct VerticalLyricsContent: View {
         settings.lyricLinesVisible == 1
     }
     
+    private var isDialogMode: Bool {
+        settings.lyricLinesVisible == 4
+    }
+    
     var body: some View {
         if audioPlayer.hasLyrics {
-            if isOneLineMode {
+            if isDialogMode {
+                // Dialog mode: game-style conversation overlay
+                GameDialogLyricsView()
+            } else if isOneLineMode {
                 // One-line mode: main lyric on top, background vocal below
                 VStack {
                     Spacer()

@@ -13,7 +13,10 @@ struct LyricsView: View {
         GeometryReader { geo in
             ZStack {
                 if audioPlayer.hasLyrics {
-                    if settings.lyricLinesVisible == 1 {
+                    if settings.lyricLinesVisible == 4 {
+                        // Dialog mode: game-style conversation overlay
+                        GameDialogLyricsView()
+                    } else if settings.lyricLinesVisible == 1 {
                         // One-line mode: single centered lyric in Mollen Bold, all caps
                         OneLineLyricView()
                     } else {

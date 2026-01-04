@@ -15,8 +15,13 @@ struct SettingsPanelView: View {
         switch settings.lyricLinesVisible {
         case 1: return "1 + 1"
         case 2: return "2 + 2"
+        case 4: return "Dialog"
         default: return "3 + 3"
         }
+    }
+    
+    private var isDialogMode: Bool {
+        settings.lyricLinesVisible == 4
     }
     
     var body: some View {
@@ -139,10 +144,10 @@ struct SettingsPanelView: View {
                                     range: 28...72
                                 )
                                 
-                                // Lines visible
+                                // Display mode
                                 VStack(spacing: 6) {
                                     HStack {
-                                        Text("Visible Lines")
+                                        Text("Display Mode")
                                             .font(.system(size: 12))
                                             .foregroundColor(.white.opacity(0.7))
                                         
@@ -153,14 +158,55 @@ struct SettingsPanelView: View {
                                             .foregroundColor(SettingsManager.accentDim)
                                     }
                                     
+                                    // First row: Minimal, Normal, Max
                                     Picker("", selection: $settings.lyricLinesVisible) {
                                         Text("Minimal").tag(1)
                                         Text("Normal").tag(2)
                                         Text("Max").tag(3)
                                     }
                                     .pickerStyle(.segmented)
+                                    
+                                    // Second row: Dialog mode button
+                                    Button(action: {
+                                        if isDialogMode {
+                                            // If already in dialog mode, open settings
+                                            settings.showDialogSettings = true
+                                        } else {
+                                            // Switch to dialog mode and open settings
+                                            settings.lyricLinesVisible = 4
+                                            settings.showDialogSettings = true
+                                        }
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "text.bubble")
+                                                .font(.system(size: 11))
+                                            Text("Dialog Mode")
+                                                .font(.system(size: 12, weight: .medium))
+                                            
+                                            if isDialogMode {
+                                                Spacer()
+                                                Image(systemName: "slider.horizontal.3")
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(.white.opacity(0.5))
+                                            }
+                                        }
+                                        .foregroundColor(isDialogMode ? .white : .white.opacity(0.6))
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 7)
+                                        .padding(.horizontal, 12)
+                                        .background(isDialogMode ? Color.white.opacity(0.15) : Color.white.opacity(0.05))
+                                        .cornerRadius(6)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(isDialogMode ? Color.white.opacity(0.3) : Color.clear, lineWidth: 1)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
+                        }
+                        .sheet(isPresented: $settings.showDialogSettings) {
+                            DialogModeSettingsSheet()
                         }
                         
                         // Visualizer Section
@@ -401,6 +447,191 @@ struct SettingsIntSlider: View {
             )
             .tint(.white.opacity(0.5))
         }
+    }
+}
+
+// MARK: - Dialog Mode Settings Sheet
+
+struct DialogModeSettingsSheet: View {
+    @EnvironmentObject var settings: SettingsManager
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Dialog Mode")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                Spacer()
+                
+                Button(action: { settings.showDialogSettings = false }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .padding(.bottom, 20)
+            
+            Divider()
+                .background(Color.white.opacity(0.1))
+            
+            // Settings
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Character Name
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Character Name")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                        
+                        TextField("CHARACTER", text: $settings.dialogCharacterName)
+                            .textFieldStyle(.plain)
+                            .font(.custom("MollenTrial-Bold", size: 14))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(Color.white.opacity(0.08))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                            )
+                    }
+                    
+                    Divider()
+                        .background(Color.white.opacity(0.1))
+                    
+                    // Max Width
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Maximum Width")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
+                            Spacer()
+                            Text("\(Int(settings.dialogMaxWidth * 100))%")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                        
+                        Slider(value: $settings.dialogMaxWidth, in: 0.4...1.0)
+                            .tint(.white.opacity(0.6))
+                    }
+                    
+                    // Max Height
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Maximum Height")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
+                            Spacer()
+                            Text("\(Int(settings.dialogMaxHeight * 100))%")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                        
+                        Slider(value: $settings.dialogMaxHeight, in: 0.1...0.5)
+                            .tint(.white.opacity(0.6))
+                    }
+                    
+                    // Position
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Vertical Position")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
+                            Spacer()
+                            Text(positionLabel)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                        
+                        Slider(value: $settings.dialogPosition, in: 0.5...0.9)
+                            .tint(.white.opacity(0.6))
+                        
+                        // Position indicator
+                        HStack {
+                            Text("Higher")
+                                .font(.system(size: 10))
+                                .foregroundColor(.white.opacity(0.3))
+                            Spacer()
+                            Text("Lower")
+                                .font(.system(size: 10))
+                                .foregroundColor(.white.opacity(0.3))
+                        }
+                    }
+                    
+                    Divider()
+                        .background(Color.white.opacity(0.1))
+                    
+                    // Reset button
+                    Button(action: resetToDefaults) {
+                        HStack {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 11))
+                            Text("Reset to Defaults")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .foregroundColor(.white.opacity(0.5))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(24)
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.1))
+            
+            // Done button
+            HStack {
+                Button(action: {
+                    // Turn off dialog mode
+                    settings.lyricLinesVisible = 2
+                    settings.showDialogSettings = false
+                }) {
+                    Text("Disable")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.6))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.white.opacity(0.08))
+                        .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+                
+                Button(action: { settings.showDialogSettings = false }) {
+                    Text("Done")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.white.opacity(0.2))
+                        .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(24)
+        }
+        .frame(width: 340, height: 480)
+        .background(Color(hex: "1a1a1a"))
+    }
+    
+    private var positionLabel: String {
+        let percent = Int((1 - settings.dialogPosition) * 100)
+        return "\(percent)% from bottom"
+    }
+    
+    private func resetToDefaults() {
+        settings.dialogCharacterName = "CHARACTER"
+        settings.dialogMaxWidth = 0.84
+        settings.dialogMaxHeight = 0.25
+        settings.dialogPosition = 0.75
     }
 }
 
