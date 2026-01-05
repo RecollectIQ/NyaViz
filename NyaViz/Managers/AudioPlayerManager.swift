@@ -137,6 +137,7 @@ class AudioPlayerManager: ObservableObject {
     func play() {
         guard let player = playerNode, audioFile != nil, let engine = audioEngine else { return }
         
+        // Ensure engine is running
         if !engine.isRunning {
             do {
                 try engine.start()
@@ -148,6 +149,17 @@ class AudioPlayerManager: ObservableObject {
         
         // Schedule the file from current position (scheduleAudio sets seekOffset)
         scheduleAudio(from: currentTime)
+        
+        // Double-check engine is still running before playing
+        if !engine.isRunning {
+            do {
+                try engine.start()
+            } catch {
+                print("Error restarting engine: \(error)")
+                return
+            }
+        }
+        
         player.play()
         
         isPlaying = true
@@ -184,6 +196,18 @@ class AudioPlayerManager: ObservableObject {
                     // If we've rescheduled (seek), the generation won't match and we should ignore
                     guard currentGeneration == self.scheduleGeneration else { return }
                     guard self.isLooping, self.isPlaying else { return }
+                    
+                    // Ensure engine is still running before looping
+                    if let engine = self.audioEngine, !engine.isRunning {
+                        do {
+                            try engine.start()
+                        } catch {
+                            print("Error restarting engine for loop: \(error)")
+                            self.isPlaying = false
+                            self.stopTimer()
+                            return
+                        }
+                    }
                     
                     self.currentTime = 0
                     self.seekOffset = 0

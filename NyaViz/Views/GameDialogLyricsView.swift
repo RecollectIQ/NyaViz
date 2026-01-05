@@ -78,6 +78,7 @@ struct GameDialogLyricsView: View {
                                 if mergedLyric.hasStyles {
                                     mergedLyric.styledMainText.attributedText(
                                         font: .custom("MollenTrial-Bold", size: fontSize),
+                                        brightness: settings.colorBrightness,
                                         uppercased: true
                                     )
                                     .multilineTextAlignment(.center)

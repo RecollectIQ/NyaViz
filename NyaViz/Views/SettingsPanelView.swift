@@ -144,6 +144,13 @@ struct SettingsPanelView: View {
                                     range: 28...72
                                 )
                                 
+                                // Color brightness for NyaViz styled lyrics
+                                SettingsSlider(
+                                    title: "Color Brightness",
+                                    value: $settings.colorBrightness,
+                                    range: 0...1
+                                )
+                                
                                 // Display mode
                                 VStack(spacing: 6) {
                                     HStack {

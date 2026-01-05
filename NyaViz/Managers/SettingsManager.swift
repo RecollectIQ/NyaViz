@@ -30,6 +30,8 @@ class SettingsManager: ObservableObject {
         static let visualizerBarCount = "visualizerBarCount"
         static let visualizerBarGap = "visualizerBarGap"
         static let visualizerBarOpacity = "visualizerBarOpacity"
+        // Color styling
+        static let colorBrightness = "colorBrightness"
     }
     
     // File names for cached images
@@ -77,6 +79,11 @@ class SettingsManager: ObservableObject {
     }
     @Published var lyricLinesVisible: Int = 2 {
         didSet { defaults.set(lyricLinesVisible, forKey: Keys.lyricLinesVisible) }
+    }
+    
+    /// Brightness multiplier for color-coded lyrics (0.0 = dim, 1.0 = full brightness)
+    @Published var colorBrightness: Double = 1.0 {
+        didSet { defaults.set(colorBrightness, forKey: Keys.colorBrightness) }
     }
     
     // Dialog Mode (game-style conversation overlay)
@@ -163,6 +170,9 @@ class SettingsManager: ObservableObject {
         }
         if defaults.object(forKey: Keys.lyricLinesVisible) != nil {
             lyricLinesVisible = defaults.integer(forKey: Keys.lyricLinesVisible)
+        }
+        if defaults.object(forKey: Keys.colorBrightness) != nil {
+            colorBrightness = defaults.double(forKey: Keys.colorBrightness)
         }
         if let savedName = defaults.string(forKey: Keys.dialogCharacterName) {
             dialogCharacterName = savedName

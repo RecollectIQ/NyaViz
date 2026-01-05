@@ -48,13 +48,27 @@ struct StyledTextView: View {
 
 /// Creates an attributed Text from a StyledLine
 extension StyledLine {
-    func attributedText(font: Font, opacity: Double = 1.0, uppercased: Bool = false) -> Text {
+    /// Render styled text with colors
+    /// - Parameters:
+    ///   - font: The base font to use
+    ///   - opacity: Overall opacity for the text (0.0 - 1.0)
+    ///   - brightness: Brightness/saturation for colors (0.0 = white/no color, 1.0 = full color)
+    ///   - uppercased: Whether to uppercase the text
+    func attributedText(font: Font, opacity: Double = 1.0, brightness: Double = 1.0, uppercased: Bool = false) -> Text {
         segments.reduce(Text("")) { result, segment in
             let displayText = uppercased ? segment.text.uppercased() : segment.text
             var text = Text(displayText)
             
-            let color = segment.color ?? .white
-            text = text.foregroundColor(color.opacity(opacity))
+            // Apply color with brightness adjustment
+            if let segmentColor = segment.color {
+                // For colored segments, blend toward white based on brightness
+                // brightness 1.0 = full color, 0.0 = white
+                let adjustedColor = segmentColor.blendedTowardWhite(amount: 1.0 - brightness)
+                text = text.foregroundColor(adjustedColor.opacity(opacity))
+            } else {
+                // Non-styled segments use white
+                text = text.foregroundColor(Color.white.opacity(opacity))
+            }
             
             if segment.isBold {
                 text = text.bold()
@@ -66,6 +80,32 @@ extension StyledLine {
             return result + text
         }
         .font(font)
+    }
+}
+
+// MARK: - Color Brightness Extension
+
+extension Color {
+    /// Blend this color toward white
+    /// - Parameter amount: 0.0 = original color, 1.0 = pure white
+    func blendedTowardWhite(amount: Double) -> Color {
+        // Clamp amount between 0 and 1
+        let t = max(0, min(1, amount))
+        
+        // Get NSColor components
+        guard let nsColor = NSColor(self).usingColorSpace(.deviceRGB) else {
+            return self
+        }
+        
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        nsColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        
+        // Interpolate toward white (1, 1, 1)
+        let newR = r + (1.0 - r) * t
+        let newG = g + (1.0 - g) * t
+        let newB = b + (1.0 - b) * t
+        
+        return Color(red: newR, green: newG, blue: newB)
     }
 }
 
@@ -116,6 +156,7 @@ struct OneLineLyricView: View {
                     if lyric.hasStyles {
                         lyric.styledMainText.attributedText(
                             font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.1),
+                            brightness: settings.colorBrightness,
                             uppercased: true
                         )
                         .fontWeight(.bold)
@@ -138,6 +179,7 @@ struct OneLineLyricView: View {
                             styledBackground.attributedText(
                                 font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.7),
                                 opacity: 0.5,
+                                brightness: settings.colorBrightness,
                                 uppercased: true
                             )
                             .multilineTextAlignment(.center)
@@ -204,7 +246,8 @@ struct SmoothLyricsView: View {
                         lyric: lyric,
                         relativePosition: relativeOffset,
                         fontSize: settings.lyricFontSize,
-                        maxDistance: CGFloat(visibleRange)
+                        maxDistance: CGFloat(visibleRange),
+                        colorBrightness: settings.colorBrightness
                     )
                     .frame(minHeight: lineHeight)
                     .offset(y: relativeOffset * totalLineHeight)
@@ -230,6 +273,7 @@ struct LyricLineView: View {
     let relativePosition: CGFloat
     let fontSize: CGFloat
     let maxDistance: CGFloat
+    let colorBrightness: Double
     
     private var opacity: Double {
         let distance = abs(relativePosition)
@@ -262,7 +306,8 @@ struct LyricLineView: View {
             if lyric.hasStyles {
                 lyric.styledText.attributedText(
                     font: .system(size: isActive ? fontSize * 1.05 : fontSize * 0.9, weight: isActive ? .bold : .semibold, design: .default),
-                    opacity: opacity
+                    opacity: opacity,
+                    brightness: colorBrightness
                 )
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
@@ -281,7 +326,8 @@ struct LyricLineView: View {
                 if styledSecondary.hasStyles {
                     styledSecondary.attributedText(
                         font: .system(size: isActive ? fontSize * 0.75 : fontSize * 0.65, weight: isActive ? .medium : .regular, design: .default),
-                        opacity: opacity * 0.6
+                        opacity: opacity * 0.6,
+                        brightness: colorBrightness
                     )
                     .multilineTextAlignment(.center)
                     .lineLimit(1)

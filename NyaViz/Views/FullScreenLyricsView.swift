@@ -116,6 +116,7 @@ struct FullScreenOneLineLyric: View {
                     if lyric.hasStyles {
                         lyric.styledMainText.attributedText(
                             font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.3),
+                            brightness: settings.colorBrightness,
                             uppercased: true
                         )
                         .fontWeight(.bold)
@@ -138,6 +139,7 @@ struct FullScreenOneLineLyric: View {
                             styledBackground.attributedText(
                                 font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.85),
                                 opacity: 0.5,
+                                brightness: settings.colorBrightness,
                                 uppercased: true
                             )
                             .multilineTextAlignment(.center)
@@ -208,7 +210,8 @@ struct FullScreenSmoothLyrics: View {
                         lyric: lyric,
                         relativePosition: relativeOffset,
                         fontSize: fontSize,
-                        maxDistance: CGFloat(visibleRange)
+                        maxDistance: CGFloat(visibleRange),
+                        colorBrightness: settings.colorBrightness
                     )
                     .frame(minHeight: lineHeight)
                     .offset(y: relativeOffset * totalLineHeight)
@@ -234,6 +237,7 @@ struct FullScreenLyricLine: View {
     let relativePosition: CGFloat
     let fontSize: CGFloat
     let maxDistance: CGFloat
+    let colorBrightness: Double
     
     private var opacity: Double {
         let distance = abs(relativePosition)
@@ -265,7 +269,8 @@ struct FullScreenLyricLine: View {
             if lyric.hasStyles {
                 lyric.styledText.attributedText(
                     font: .system(size: isActive ? fontSize * 1.08 : fontSize * 0.85, weight: isActive ? .heavy : .bold, design: .default),
-                    opacity: opacity
+                    opacity: opacity,
+                    brightness: colorBrightness
                 )
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
@@ -284,7 +289,8 @@ struct FullScreenLyricLine: View {
                 if styledSecondary.hasStyles {
                     styledSecondary.attributedText(
                         font: .system(size: isActive ? fontSize * 0.8 : fontSize * 0.65, weight: isActive ? .semibold : .medium, design: .default),
-                        opacity: opacity * 0.6
+                        opacity: opacity * 0.6,
+                        brightness: colorBrightness
                     )
                     .multilineTextAlignment(.center)
                     .lineLimit(1)
