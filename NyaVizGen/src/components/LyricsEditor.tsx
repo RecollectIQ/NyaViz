@@ -31,6 +31,11 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
     </svg>
   ),
+  flag: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0l2.77-.693a9 9 0 016.208.682l.108.054a9 9 0 006.086.71l3.114-.732a48.524 48.524 0 01-.005-10.499l-3.11.732a9 9 0 01-6.085-.711l-.108-.054a9 9 0 00-6.208-.682L3 4.5M3 15V4.5" />
+    </svg>
+  ),
 };
 
 export function LyricsEditor({
@@ -58,6 +63,25 @@ export function LyricsEditor({
       }
     }
   }, [isTimingMode, currentLineIndex, lines]);
+
+  // Handle X key to mark current line for review during timing mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'x' && isTimingMode && currentLineIndex > 0) {
+        // Mark the previous line (the one just timed)
+        const prevLineIndex = currentLineIndex - 1;
+        const updatedLines = lines.map((line, idx) => 
+          idx === prevLineIndex 
+            ? { ...line, markedForReview: !line.markedForReview }
+            : line
+        );
+        onUpdateLines(updatedLines);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isTimingMode, currentLineIndex, lines, onUpdateLines]);
 
   const handleWordClick = useCallback((wordId: string, lineId: string, shiftKey: boolean) => {
     if (isTimingMode) return;
@@ -202,7 +226,12 @@ export function LyricsEditor({
 
         <div className="flex items-center gap-2 px-3 py-2 text-xs text-[var(--muted-foreground)] bg-[var(--gray-900)] border-b border-[var(--border)]">
           {Icons.info}
-          <span>Click words to select. Hold Shift + Click for range. Double-click line number to select entire line.</span>
+          <span>
+            {isTimingMode 
+              ? 'Press X after timing a line to mark it for review'
+              : 'Click words to select. Shift+Click for range. Double-click line # to select all.'
+            }
+          </span>
         </div>
       </div>
 
@@ -213,6 +242,7 @@ export function LyricsEditor({
             const isCurrentLine = idx === currentLineIndex && isTimingMode;
             const isPast = line.startTime !== null && line.endTime !== null;
             const isActive = line.startTime !== null && line.endTime === null;
+            const isMarked = line.markedForReview;
             
             return (
               <div
@@ -225,7 +255,9 @@ export function LyricsEditor({
                   }
                 }}
                 className={`group flex items-start gap-3 p-3 rounded-lg transition-all ${
-                  isCurrentLine 
+                  isMarked
+                    ? 'bg-[#ef4444]/10 border-l-2 border-[#ef4444]'
+                    : isCurrentLine 
                     ? 'line-timing bg-[var(--gray-800)]' 
                     : isActive
                     ? 'bg-[var(--gray-800)]/50 border-l-2 border-[var(--gray-500)]'
@@ -300,10 +332,13 @@ export function LyricsEditor({
 
                 {/* Status indicators */}
                 <div className="flex items-center gap-2 min-w-[20px]">
+                  {isMarked && (
+                    <span className="text-[#ef4444]" title="Marked for review">{Icons.flag}</span>
+                  )}
                   {isActive && (
                     <span className="text-[var(--gray-400)] pulse-active">{Icons.dot}</span>
                   )}
-                  {isPast && (
+                  {isPast && !isMarked && (
                     <span className="text-[var(--gray-500)]">{Icons.check}</span>
                   )}
                 </div>

@@ -1,16 +1,16 @@
 'use client';
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { LyricsEditor } from '@/components/LyricsEditor';
 import { TimingControls } from '@/components/TimingControls';
+import { ExportPreview } from '@/components/ExportPreview';
 import { 
-  LyricLine, 
+  LyricLine,
   parseLyrics, 
   generateNyaVizContent,
 } from '@/lib/types';
@@ -89,7 +89,7 @@ export default function Home() {
   const [isTimingMode, setIsTimingMode] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [previewContent, setPreviewContent] = useState('');
+  const [showExportPreview, setShowExportPreview] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -126,11 +126,6 @@ export default function Home() {
   const isAudioLoaded = duration > 0;
   const isPlaying = audioRef.current ? !audioRef.current.paused : false;
 
-  const handleExport = useCallback(() => {
-    const content = generateNyaVizContent(lines);
-    setPreviewContent(content);
-  }, [lines]);
-
   const handleDownload = useCallback(() => {
     const content = generateNyaVizContent(lines);
     const blob = new Blob([content], { type: 'text/plain' });
@@ -145,13 +140,6 @@ export default function Home() {
   }, [lines]);
 
   const timedLinesCount = lines.filter(l => l.startTime !== null && l.endTime !== null).length;
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(previewContent);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [previewContent]);
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -186,56 +174,14 @@ export default function Home() {
                     <span className="ml-2">Edit Lyrics</span>
                   </Button>
                   
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button
-                        onClick={handleExport}
-                        disabled={timedLinesCount === 0}
-                        className="btn-primary text-[var(--foreground)] disabled:opacity-30"
-                      >
-                        {Icons.document}
-                        <span className="ml-2">Export .nyaviz</span>
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl bg-[var(--gray-900)] border-[var(--border)] shadow-soft-lg">
-                      <DialogHeader>
-                        <DialogTitle className="text-[var(--foreground)]">Export NyaViz File</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div className="p-4 rounded-lg bg-[var(--gray-850)] border border-[var(--border)] max-h-96 overflow-auto font-mono text-sm text-[var(--foreground)]">
-                          <pre className="whitespace-pre-wrap">{previewContent}</pre>
-                        </div>
-                        <div className="flex justify-end gap-3">
-                          <Button
-                            onClick={handleCopy}
-                            variant="outline"
-                            className={`border-[var(--border)] hover:bg-[var(--gray-800)] min-w-[100px] transition-all ${copied ? 'border-[var(--success)]/50 text-[var(--success)]' : ''}`}
-                          >
-                            {copied ? (
-                              <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                                <span className="ml-2">Copied!</span>
-                              </>
-                            ) : (
-                              <>
-                                {Icons.copy}
-                                <span className="ml-2">Copy</span>
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            onClick={handleDownload}
-                            className="btn-primary text-[var(--foreground)]"
-                          >
-                            {Icons.download}
-                            <span className="ml-2">Download .nyaviz</span>
-                          </Button>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  <Button
+                    onClick={() => setShowExportPreview(true)}
+                    disabled={timedLinesCount === 0}
+                    className="btn-primary text-[var(--foreground)] disabled:opacity-30"
+                  >
+                    {Icons.document}
+                    <span className="ml-2">Export .nyaviz</span>
+                  </Button>
                 </div>
               )}
             </div>
@@ -390,6 +336,18 @@ Violet dreams and golden seams`}
           )}
       </main>
       </div>
+
+      {/* Export Preview Modal */}
+      {showExportPreview && (
+        <ExportPreview
+          lines={lines}
+          onUpdateLines={setLines}
+          onExport={handleDownload}
+          onClose={() => setShowExportPreview(false)}
+          audioRef={audioRef}
+          duration={duration}
+        />
+      )}
     </div>
   );
 }

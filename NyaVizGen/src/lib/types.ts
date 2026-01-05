@@ -7,6 +7,7 @@ export interface LyricLine {
   startTime: number | null; // in milliseconds
   endTime: number | null;
   secondaryText?: string; // for translations/echoes
+  markedForReview?: boolean; // flag for potential timing errors
 }
 
 export interface Word {
