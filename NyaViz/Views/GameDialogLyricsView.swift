@@ -12,8 +12,12 @@ struct GameDialogLyricsView: View {
     @EnvironmentObject var settings: SettingsManager
     
     // Use oneLineModeLyric to respect SRT end times (like minimal mode)
+    private var currentMergedLyric: AudioPlayerManager.MergedLyric? {
+        audioPlayer.oneLineModeLyric
+    }
+    
     private var currentLyric: String? {
-        audioPlayer.oneLineModeLyric?.mainText
+        currentMergedLyric?.mainText
     }
     
     private var hasCurrentLyric: Bool {
@@ -69,10 +73,13 @@ struct GameDialogLyricsView: View {
                         
                         // Main dialog box - centered text, dynamic width
                         VStack(spacing: 0) {
-                            if let lyric = currentLyric {
-                                Text(lyric.uppercased())
-                                    .font(.custom("MollenTrial-Bold", size: fontSize))
-                                    .foregroundColor(.white)
+                            if let mergedLyric = currentMergedLyric, let lyric = currentLyric {
+                                // Use styled text if available
+                                if mergedLyric.hasStyles {
+                                    mergedLyric.styledMainText.attributedText(
+                                        font: .custom("MollenTrial-Bold", size: fontSize),
+                                        uppercased: true
+                                    )
                                     .multilineTextAlignment(.center)
                                     .lineLimit(4)
                                     .minimumScaleFactor(0.5)
@@ -80,6 +87,18 @@ struct GameDialogLyricsView: View {
                                     .frame(maxWidth: .infinity)
                                     .id("dialog-\(lyric)")
                                     .transition(.opacity)
+                                } else {
+                                    Text(lyric.uppercased())
+                                        .font(.custom("MollenTrial-Bold", size: fontSize))
+                                        .foregroundColor(.white)
+                                        .multilineTextAlignment(.center)
+                                        .lineLimit(4)
+                                        .minimumScaleFactor(0.5)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .frame(maxWidth: .infinity)
+                                        .id("dialog-\(lyric)")
+                                        .transition(.opacity)
+                                }
                             } else {
                                 // Empty state with placeholder (when between lyrics or SRT ended)
                                 Text("...")

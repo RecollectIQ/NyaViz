@@ -849,7 +849,12 @@ class SimulatedAudioPlayer: ObservableObject {
             guard time >= lyric.startTime && time < lyric.endTime else { continue }
             let duration = lyric.endTime - lyric.startTime
             guard duration >= 0.25 else { continue }
-            return AudioPlayerManager.MergedLyric(mainText: lyric.text, backgroundText: lyric.secondaryText)
+            return AudioPlayerManager.MergedLyric(
+                mainText: lyric.text,
+                backgroundText: lyric.secondaryText,
+                styledMainText: lyric.styledText,
+                styledBackgroundText: lyric.styledSecondaryText
+            )
         }
         
         var lastLyric: Lyric? = nil
@@ -867,7 +872,12 @@ class SimulatedAudioPlayer: ObservableObject {
             })?.startTime ?? .infinity
             
             if time < nextStart {
-                return AudioPlayerManager.MergedLyric(mainText: last.text, backgroundText: last.secondaryText)
+                return AudioPlayerManager.MergedLyric(
+                    mainText: last.text,
+                    backgroundText: last.secondaryText,
+                    styledMainText: last.styledText,
+                    styledBackgroundText: last.styledSecondaryText
+                )
             }
         }
         

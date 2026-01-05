@@ -67,7 +67,7 @@ struct SettingsPanelView: View {
                                 
                                 SettingsButton(
                                     icon: "text.alignleft",
-                                    title: "Open SRT",
+                                    title: "Open Lyrics",
                                     subtitle: audioPlayer.hasLyrics ? "\(audioPlayer.lyrics.count) lines" : "No file"
                                 ) {
                                     openSRTFile()
@@ -264,10 +264,18 @@ struct SettingsPanelView: View {
     
     private func openSRTFile() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [UTType(filenameExtension: "srt")!, .plainText]
+        // Support both .srt and .nyaviz formats
+        var allowedTypes: [UTType] = [.plainText]
+        if let srtType = UTType(filenameExtension: "srt") {
+            allowedTypes.insert(srtType, at: 0)
+        }
+        if let nyavizType = UTType(filenameExtension: "nyaviz") {
+            allowedTypes.insert(nyavizType, at: 0)
+        }
+        panel.allowedContentTypes = allowedTypes
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.message = "Select an SRT file"
+        panel.message = "Select a lyrics file (.srt or .nyaviz)"
         
         if panel.runModal() == .OK, let url = panel.url {
             audioPlayer.loadSRT(from: url)

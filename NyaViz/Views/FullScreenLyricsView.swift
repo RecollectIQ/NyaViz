@@ -112,24 +112,47 @@ struct FullScreenOneLineLyric: View {
             
             if let lyric = audioPlayer.oneLineModeLyric {
                 VStack(spacing: 10) {
-                    // Main lyric (top, bold, all caps)
-                    Text(lyric.mainText.uppercased())
-                        .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.3))
+                    // Main lyric (top, bold, all caps) - with styled text support
+                    if lyric.hasStyles {
+                        lyric.styledMainText.attributedText(
+                            font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.3),
+                            uppercased: true
+                        )
                         .fontWeight(.bold)
-                        .foregroundColor(.white)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                         .minimumScaleFactor(0.5)
+                    } else {
+                        Text(lyric.mainText.uppercased())
+                            .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.3))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.5)
+                    }
                     
                     // Background vocal (bottom, smaller, dimmer)
-                    if let background = lyric.backgroundText {
-                        Text(background.uppercased())
-                            .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.85))
-                            .foregroundColor(.white.opacity(0.5))
+                    if let styledBackground = lyric.styledBackgroundText {
+                        if styledBackground.hasStyles {
+                            styledBackground.attributedText(
+                                font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.85),
+                                opacity: 0.5,
+                                uppercased: true
+                            )
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        } else {
+                            Text(styledBackground.plainText.uppercased())
+                                .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.85))
+                                .foregroundColor(.white.opacity(0.5))
+                                .multilineTextAlignment(.center)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        }
                     }
                 }
                 .padding(.horizontal, 60)
@@ -182,8 +205,7 @@ struct FullScreenSmoothLyrics: View {
                     let relativeOffset = CGFloat(offset) - (smoothIndex - CGFloat(audioPlayer.currentLyricIndex))
                     
                     FullScreenLyricLine(
-                        text: lyric.text,
-                        secondaryText: lyric.secondaryText,
+                        lyric: lyric,
                         relativePosition: relativeOffset,
                         fontSize: fontSize,
                         maxDistance: CGFloat(visibleRange)
@@ -208,8 +230,7 @@ struct FullScreenSmoothLyrics: View {
 }
 
 struct FullScreenLyricLine: View {
-    let text: String
-    let secondaryText: String?
+    let lyric: Lyric
     let relativePosition: CGFloat
     let fontSize: CGFloat
     let maxDistance: CGFloat
@@ -240,22 +261,42 @@ struct FullScreenLyricLine: View {
     
     var body: some View {
         VStack(spacing: 6) {
-            // Main lyric
-            Text(text)
-                .font(.system(size: isActive ? fontSize * 1.08 : fontSize * 0.85, weight: isActive ? .heavy : .bold, design: .default))
+            // Main lyric with styled text support
+            if lyric.hasStyles {
+                lyric.styledText.attributedText(
+                    font: .system(size: isActive ? fontSize * 1.08 : fontSize * 0.85, weight: isActive ? .heavy : .bold, design: .default),
+                    opacity: opacity
+                )
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
-                .foregroundColor(.white.opacity(opacity))
+            } else {
+                Text(lyric.text)
+                    .font(.system(size: isActive ? fontSize * 1.08 : fontSize * 0.85, weight: isActive ? .heavy : .bold, design: .default))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                    .foregroundColor(.white.opacity(opacity))
+            }
             
             // Secondary lyric (translation) - slightly smaller and dimmer
-            if let secondary = secondaryText {
-                Text(secondary)
-                    .font(.system(size: isActive ? fontSize * 0.8 : fontSize * 0.65, weight: isActive ? .semibold : .medium, design: .default))
+            if let styledSecondary = lyric.styledSecondaryText {
+                if styledSecondary.hasStyles {
+                    styledSecondary.attributedText(
+                        font: .system(size: isActive ? fontSize * 0.8 : fontSize * 0.65, weight: isActive ? .semibold : .medium, design: .default),
+                        opacity: opacity * 0.6
+                    )
                     .multilineTextAlignment(.center)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                    .foregroundColor(.white.opacity(opacity * 0.6))
+                } else {
+                    Text(styledSecondary.plainText)
+                        .font(.system(size: isActive ? fontSize * 0.8 : fontSize * 0.65, weight: isActive ? .semibold : .medium, design: .default))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .foregroundColor(.white.opacity(opacity * 0.6))
+                }
             }
         }
         .scaleEffect(scale)

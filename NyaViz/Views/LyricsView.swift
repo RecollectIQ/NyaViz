@@ -5,6 +5,72 @@
 
 import SwiftUI
 
+// MARK: - Styled Text View
+
+/// A view that renders a StyledLine with colors, bold, and italic formatting
+struct StyledTextView: View {
+    let styledLine: StyledLine
+    let baseFont: Font
+    let baseOpacity: Double
+    let uppercased: Bool
+    
+    init(_ styledLine: StyledLine, font: Font, opacity: Double = 1.0, uppercased: Bool = false) {
+        self.styledLine = styledLine
+        self.baseFont = font
+        self.baseOpacity = opacity
+        self.uppercased = uppercased
+    }
+    
+    var body: some View {
+        styledLine.segments.reduce(Text("")) { result, segment in
+            let displayText = uppercased ? segment.text.uppercased() : segment.text
+            var text = Text(displayText)
+            
+            // Apply color (default white if no color specified)
+            let color = segment.color ?? .white
+            text = text.foregroundColor(color.opacity(baseOpacity))
+            
+            // Apply bold
+            if segment.isBold {
+                text = text.bold()
+            }
+            
+            // Apply italic
+            if segment.isItalic {
+                text = text.italic()
+            }
+            
+            return result + text
+        }
+        .font(baseFont)
+    }
+}
+
+/// Creates an attributed Text from a StyledLine
+extension StyledLine {
+    func attributedText(font: Font, opacity: Double = 1.0, uppercased: Bool = false) -> Text {
+        segments.reduce(Text("")) { result, segment in
+            let displayText = uppercased ? segment.text.uppercased() : segment.text
+            var text = Text(displayText)
+            
+            let color = segment.color ?? .white
+            text = text.foregroundColor(color.opacity(opacity))
+            
+            if segment.isBold {
+                text = text.bold()
+            }
+            if segment.isItalic {
+                text = text.italic()
+            }
+            
+            return result + text
+        }
+        .font(font)
+    }
+}
+
+// MARK: - Lyrics View
+
 struct LyricsView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
@@ -46,24 +112,47 @@ struct OneLineLyricView: View {
             
             if let lyric = audioPlayer.oneLineModeLyric {
                 VStack(spacing: 8) {
-                    // Main lyric (top, bold, all caps)
-                    Text(lyric.mainText.uppercased())
-                        .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.1))
+                    // Main lyric (top, bold, all caps) - with styled text support
+                    if lyric.hasStyles {
+                        lyric.styledMainText.attributedText(
+                            font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.1),
+                            uppercased: true
+                        )
                         .fontWeight(.bold)
-                        .foregroundColor(.white)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                         .minimumScaleFactor(0.6)
+                    } else {
+                        Text(lyric.mainText.uppercased())
+                            .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.1))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.6)
+                    }
                     
                     // Background vocal (bottom, smaller, dimmer)
-                    if let background = lyric.backgroundText {
-                        Text(background.uppercased())
-                            .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.7))
-                            .foregroundColor(.white.opacity(0.5))
+                    if let styledBackground = lyric.styledBackgroundText {
+                        if styledBackground.hasStyles {
+                            styledBackground.attributedText(
+                                font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.7),
+                                opacity: 0.5,
+                                uppercased: true
+                            )
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        } else {
+                            Text(styledBackground.plainText.uppercased())
+                                .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.7))
+                                .foregroundColor(.white.opacity(0.5))
+                                .multilineTextAlignment(.center)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        }
                     }
                 }
                 .padding(.horizontal, 40)
@@ -112,8 +201,7 @@ struct SmoothLyricsView: View {
                     let relativeOffset = CGFloat(offset) - (smoothIndex - CGFloat(audioPlayer.currentLyricIndex))
                     
                     LyricLineView(
-                        text: lyric.text,
-                        secondaryText: lyric.secondaryText,
+                        lyric: lyric,
                         relativePosition: relativeOffset,
                         fontSize: settings.lyricFontSize,
                         maxDistance: CGFloat(visibleRange)
@@ -138,8 +226,7 @@ struct SmoothLyricsView: View {
 }
 
 struct LyricLineView: View {
-    let text: String
-    let secondaryText: String?
+    let lyric: Lyric
     let relativePosition: CGFloat
     let fontSize: CGFloat
     let maxDistance: CGFloat
@@ -171,22 +258,42 @@ struct LyricLineView: View {
     
     var body: some View {
         VStack(spacing: 4) {
-            // Main lyric
-            Text(text)
-                .font(.system(size: isActive ? fontSize * 1.05 : fontSize * 0.9, weight: isActive ? .bold : .semibold, design: .default))
+            // Main lyric with styled text support
+            if lyric.hasStyles {
+                lyric.styledText.attributedText(
+                    font: .system(size: isActive ? fontSize * 1.05 : fontSize * 0.9, weight: isActive ? .bold : .semibold, design: .default),
+                    opacity: opacity
+                )
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
-                .foregroundColor(.white.opacity(opacity))
+            } else {
+                Text(lyric.text)
+                    .font(.system(size: isActive ? fontSize * 1.05 : fontSize * 0.9, weight: isActive ? .bold : .semibold, design: .default))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                    .foregroundColor(.white.opacity(opacity))
+            }
             
             // Secondary lyric (translation) - slightly smaller and dimmer
-            if let secondary = secondaryText {
-                Text(secondary)
-                    .font(.system(size: isActive ? fontSize * 0.75 : fontSize * 0.65, weight: isActive ? .medium : .regular, design: .default))
+            if let styledSecondary = lyric.styledSecondaryText {
+                if styledSecondary.hasStyles {
+                    styledSecondary.attributedText(
+                        font: .system(size: isActive ? fontSize * 0.75 : fontSize * 0.65, weight: isActive ? .medium : .regular, design: .default),
+                        opacity: opacity * 0.6
+                    )
                     .multilineTextAlignment(.center)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                    .foregroundColor(.white.opacity(opacity * 0.6))
+                } else {
+                    Text(styledSecondary.plainText)
+                        .font(.system(size: isActive ? fontSize * 0.75 : fontSize * 0.65, weight: isActive ? .medium : .regular, design: .default))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .foregroundColor(.white.opacity(opacity * 0.6))
+                }
             }
         }
         .scaleEffect(scale)

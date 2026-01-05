@@ -125,11 +125,13 @@ class AudioPlayerManager: ObservableObject {
         }
     }
     
+    /// Load lyrics from SRT or NyaViz format files
     func loadSRT(from url: URL) {
-        lyrics = SRTParser.load(from: url)
+        lyrics = SubtitleLoader.load(from: url)
         currentLyricIndex = -1
         updateCurrentLyric()
-        print("Loaded \(lyrics.count) lyrics from SRT")
+        let formatName = url.pathExtension.lowercased() == "nyaviz" ? "NyaViz" : "SRT"
+        print("Loaded \(lyrics.count) lyrics from \(formatName)")
     }
     
     func play() {
@@ -459,8 +461,17 @@ class AudioPlayerManager: ObservableObject {
         let mainText: String
         let backgroundText: String? // Parenthetical backup vocals
         
+        // Styled versions for color/formatting support
+        let styledMainText: StyledLine
+        let styledBackgroundText: StyledLine?
+        
         var displayId: String {
             mainText + (backgroundText ?? "")
+        }
+        
+        /// Whether this lyric has styled text
+        var hasStyles: Bool {
+            styledMainText.hasStyles || (styledBackgroundText?.hasStyles ?? false)
         }
     }
     
@@ -479,8 +490,13 @@ class AudioPlayerManager: ObservableObject {
             let duration = lyric.endTime - lyric.startTime
             guard duration >= Self.minLyricDuration else { continue }
             
-            // Return the lyric with its pre-merged secondary text
-            return MergedLyric(mainText: lyric.text, backgroundText: lyric.secondaryText)
+            // Return the lyric with its styled text
+            return MergedLyric(
+                mainText: lyric.text,
+                backgroundText: lyric.secondaryText,
+                styledMainText: lyric.styledText,
+                styledBackgroundText: lyric.styledSecondaryText
+            )
         }
         
         // Check if we should extend a previous lyric (to bridge short gaps)
@@ -500,7 +516,12 @@ class AudioPlayerManager: ObservableObject {
             })?.startTime ?? .infinity
             
             if time < nextStart {
-                return MergedLyric(mainText: last.text, backgroundText: last.secondaryText)
+                return MergedLyric(
+                    mainText: last.text,
+                    backgroundText: last.secondaryText,
+                    styledMainText: last.styledText,
+                    styledBackgroundText: last.styledSecondaryText
+                )
             }
         }
         
