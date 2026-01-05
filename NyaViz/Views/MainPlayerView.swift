@@ -287,24 +287,49 @@ struct VerticalLyricsContent: View {
                     
                     if let lyric = audioPlayer.oneLineModeLyric {
                         VStack(spacing: 8) {
-                            // Main lyric (top, bold, all caps)
-                            Text(lyric.mainText.uppercased())
-                                .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.1))
+                            // Main lyric (top, bold, all caps) - with styled text support
+                            if lyric.hasStyles {
+                                lyric.styledMainText.attributedText(
+                                    font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.1),
+                                    brightness: settings.colorBrightness,
+                                    uppercased: true
+                                )
                                 .fontWeight(.bold)
-                                .foregroundColor(.white)
                                 .multilineTextAlignment(.center)
                                 .lineLimit(2)
                                 .minimumScaleFactor(0.5)
+                            } else {
+                                Text(lyric.mainText.uppercased())
+                                    .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.1))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.5)
+                            }
                             
                             // Background vocal (bottom, smaller, dimmer)
-                            if let background = lyric.backgroundText {
-                                Text(background.uppercased())
-                                    .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.7))
-                                    .foregroundColor(.white.opacity(0.5))
+                            if let styledBackground = lyric.styledBackgroundText {
+                                if styledBackground.hasStyles {
+                                    styledBackground.attributedText(
+                                        font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.7),
+                                        opacity: 0.5,
+                                        brightness: settings.colorBrightness,
+                                        uppercased: true
+                                    )
                                     .multilineTextAlignment(.center)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.5)
                                     .transition(.opacity.combined(with: .move(edge: .bottom)))
+                                } else {
+                                    Text(styledBackground.plainText.uppercased())
+                                        .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.7))
+                                        .foregroundColor(.white.opacity(0.5))
+                                        .multilineTextAlignment(.center)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.5)
+                                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                                }
                             }
                         }
                         .padding(.horizontal, 60)
@@ -320,9 +345,13 @@ struct VerticalLyricsContent: View {
                 VStack(spacing: lineSpacing) {
                     // Current lyric (bright, bold)
                     if audioPlayer.currentLyricIndex >= 0 && audioPlayer.currentLyricIndex < audioPlayer.lyrics.count {
-                        Text(audioPlayer.lyrics[audioPlayer.currentLyricIndex].text)
-                            .font(.system(size: settings.lyricFontSize, weight: .bold))
-                            .foregroundColor(.white)
+                        let currentLyric = audioPlayer.lyrics[audioPlayer.currentLyricIndex]
+                        
+                        if currentLyric.hasStyles {
+                            currentLyric.styledText.attributedText(
+                                font: .system(size: settings.lyricFontSize, weight: .bold),
+                                brightness: settings.colorBrightness
+                            )
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
                             .minimumScaleFactor(0.7)
@@ -333,23 +362,53 @@ struct VerticalLyricsContent: View {
                                 insertion: .opacity.combined(with: .offset(y: 15)),
                                 removal: .opacity.combined(with: .offset(y: -15))
                             ))
+                        } else {
+                            Text(currentLyric.text)
+                                .font(.system(size: settings.lyricFontSize, weight: .bold))
+                                .foregroundColor(.white)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.7)
+                                .frame(maxWidth: .infinity)
+                                .padding(.horizontal, 60)
+                                .id("current-\(audioPlayer.currentLyricIndex)")
+                                .transition(.asymmetric(
+                                    insertion: .opacity.combined(with: .offset(y: 15)),
+                                    removal: .opacity.combined(with: .offset(y: -15))
+                                ))
+                        }
                     }
                 
                     // Future lyrics (gray, progressively fading)
                     ForEach(1...visibleFutureLines, id: \.self) { offset in
                         let index = audioPlayer.currentLyricIndex + offset
                         if index >= 0 && index < audioPlayer.lyrics.count {
+                            let futureLyric = audioPlayer.lyrics[index]
                             let opacity = 0.35 - Double(offset - 1) * 0.1
                             
-                            Text(audioPlayer.lyrics[index].text)
-                                .font(.system(size: settings.lyricFontSize * 0.75, weight: .medium))
-                                .foregroundColor(.white.opacity(max(0.06, opacity)))
+                            if futureLyric.hasStyles {
+                                futureLyric.styledText.attributedText(
+                                    font: .system(size: settings.lyricFontSize * 0.75, weight: .medium),
+                                    opacity: max(0.06, opacity),
+                                    brightness: settings.colorBrightness
+                                )
                                 .multilineTextAlignment(.center)
                                 .lineLimit(2)
                                 .minimumScaleFactor(0.7)
                                 .frame(maxWidth: .infinity)
                                 .padding(.horizontal, 60)
                                 .id("future-\(index)")
+                            } else {
+                                Text(futureLyric.text)
+                                    .font(.system(size: settings.lyricFontSize * 0.75, weight: .medium))
+                                    .foregroundColor(.white.opacity(max(0.06, opacity)))
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.7)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.horizontal, 60)
+                                    .id("future-\(index)")
+                            }
                         }
                     }
                 }
