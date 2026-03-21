@@ -171,6 +171,83 @@ How much you must have [#FF4444]suffered[/] through my anger
 [#8B00FF bold]VIOLET[/] dreams and [#FFD700 italic]golden[/] seams
 ```
 
+## Feature: Inline Directives
+
+Directives let a `.nyaviz` file change display settings at specific playback times. A directive is a standalone block (separated from other blocks by blank lines) containing exactly one line that starts with `!`.
+
+### Syntax
+
+```
+!HH:MM:SS,mmm type:value
+```
+
+- The timestamp format is identical to subtitle timestamps (`HH:MM:SS,mmm` or `HH:MM:SS.mmm`).
+- `type` identifies the directive; `value` is the directive-specific argument.
+- Whitespace around the timestamp and value is ignored.
+- Lines that do not match this pattern (unknown type, malformed timestamp, missing value) are silently skipped.
+
+### Supported Directive Types
+
+#### `mode`
+
+Switches the number of lyric lines displayed.
+
+| Value | Effect |
+|-------|--------|
+| `minimal` | Show 1 lyric line (`lyricLinesVisible = 1`) |
+| `dialog` | Show 4 lyric lines (`lyricLinesVisible = 4`) |
+
+```
+!00:01:30,000 mode:minimal
+!00:02:00,000 mode:dialog
+```
+
+Only `minimal` and `dialog` are valid mode values. Any other value is ignored.
+
+#### `background`
+
+Loads a new background image at the specified time. The value is a filename or relative path resolved against the directory that contains the `.nyaviz` file.
+
+```
+!00:02:30,000 background:chorus_backdrop.jpg
+!00:03:00,000 background:assets/verse2.png
+```
+
+If the referenced file does not exist, the directive is silently ignored.
+
+### Directive Placement
+
+Directives appear between subtitle blocks, separated by blank lines just like regular blocks:
+
+```
+1
+00:00:00,000 --> 00:00:05,000
+Opening lyric
+
+!00:00:05,000 mode:minimal
+
+2
+00:00:05,000 --> 00:00:12,000
+Verse one lyric
+
+!00:01:30,000 background:chorus.jpg
+!00:01:30,000 mode:dialog
+
+3
+00:01:30,000 --> 00:01:38,000
+Chorus lyric
+```
+
+A directive block must contain only the single directive line. If a block has multiple lines, it is treated as a subtitle block and the directive is ignored.
+
+### Seek Behaviour
+
+When the user seeks to a new position, directives are re-evaluated from the beginning up to the seeked position, so the display state always reflects what it should be at that point in the track.
+
+### Backwards Compatibility
+
+Files without any directive lines parse and display exactly as before. The directive feature is purely additive.
+
 ## Parsing Rules
 
 1. **Backwards Compatibility**: Plain text without markers renders normally
@@ -220,13 +297,40 @@ struct Lyric {
 }
 ```
 
+### Directive Types
+
+```swift
+/// A directive that changes display settings at a specific playback time
+struct NyaVizDirective {
+    enum DirectiveType: Equatable {
+        case mode(String)        // "minimal" (1 line) or "dialog" (4 lines)
+        case background(String)  // filename/path relative to the .nyaviz file
+    }
+
+    let time: TimeInterval   // Seconds from track start
+    let type: DirectiveType
+}
+
+/// Combined result of a full NyaViz parse
+struct NyaVizParseResult {
+    let lyrics: [Lyric]
+    let directives: [NyaVizDirective]  // Sorted by time
+}
+```
+
 ### Loading Files
 
 ```swift
-// Automatic format detection
+// Automatic format detection – lyrics only (backwards compatible)
 let lyrics = SubtitleLoader.load(from: fileURL)
 
-// Explicit NyaViz parsing
+// Automatic format detection – lyrics + directives
+let result = SubtitleLoader.loadWithDirectives(from: fileURL)
+
+// Explicit NyaViz parsing – lyrics + directives
+let result = NyaVizParser.loadWithDirectives(from: fileURL)
+
+// Explicit NyaViz parsing – lyrics only
 let lyrics = NyaVizParser.load(from: fileURL)
 
 // Explicit SRT parsing
@@ -253,5 +357,5 @@ let styledLine = NyaVizParser.parseStyledLine("Hello [#FF0000]World[/]")
 
 ---
 
-*NyaViz Format Specification v1.0*
+*NyaViz Format Specification v1.1*
 

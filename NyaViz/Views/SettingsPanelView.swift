@@ -13,10 +13,9 @@ struct SettingsPanelView: View {
     
     private var linesLabel: String {
         switch settings.lyricLinesVisible {
-        case 1: return "1 + 1"
-        case 2: return "2 + 2"
+        case 1: return "Minimal"
         case 4: return "Dialog"
-        default: return "3 + 3"
+        default: return "Minimal"
         }
     }
     
@@ -165,50 +164,33 @@ struct SettingsPanelView: View {
                                             .foregroundColor(SettingsManager.accentDim)
                                     }
                                     
-                                    // First row: Minimal, Normal, Max
+                                    // Lyric mode: Minimal or Dialog
                                     Picker("", selection: $settings.lyricLinesVisible) {
                                         Text("Minimal").tag(1)
-                                        Text("Normal").tag(2)
-                                        Text("Max").tag(3)
+                                        Text("Dialog").tag(4)
                                     }
                                     .pickerStyle(.segmented)
-                                    
-                                    // Second row: Dialog mode button
-                                    Button(action: {
-                                        if isDialogMode {
-                                            // If already in dialog mode, open settings
+
+                                    // Dialog settings button (when in dialog mode)
+                                    if isDialogMode {
+                                        Button(action: {
                                             settings.showDialogSettings = true
-                                        } else {
-                                            // Switch to dialog mode and open settings
-                                            settings.lyricLinesVisible = 4
-                                            settings.showDialogSettings = true
-                                        }
-                                    }) {
-                                        HStack {
-                                            Image(systemName: "text.bubble")
-                                                .font(.system(size: 11))
-                                            Text("Dialog Mode")
-                                                .font(.system(size: 12, weight: .medium))
-                                            
-                                            if isDialogMode {
-                                                Spacer()
+                                        }) {
+                                            HStack {
                                                 Image(systemName: "slider.horizontal.3")
-                                                    .font(.system(size: 10))
-                                                    .foregroundColor(.white.opacity(0.5))
+                                                    .font(.system(size: 11))
+                                                Text("Dialog Settings")
+                                                    .font(.system(size: 12, weight: .medium))
                                             }
+                                            .foregroundColor(.white.opacity(0.6))
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 7)
+                                            .padding(.horizontal, 12)
+                                            .background(Color.white.opacity(0.05))
+                                            .cornerRadius(6)
                                         }
-                                        .foregroundColor(isDialogMode ? .white : .white.opacity(0.6))
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 7)
-                                        .padding(.horizontal, 12)
-                                        .background(isDialogMode ? Color.white.opacity(0.15) : Color.white.opacity(0.05))
-                                        .cornerRadius(6)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 6)
-                                                .stroke(isDialogMode ? Color.white.opacity(0.3) : Color.clear, lineWidth: 1)
-                                        )
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             }
                         }

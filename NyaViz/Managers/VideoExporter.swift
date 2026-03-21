@@ -752,7 +752,12 @@ struct CapturedSettings: Sendable {
     let visualizerBarCount: Int
     let visualizerBarGap: CGFloat
     let visualizerBarOpacity: Double
-    
+    let colorBrightness: Double
+    let dialogCharacterName: String
+    let dialogMaxWidth: Double
+    let dialogMaxHeight: Double
+    let dialogPosition: Double
+
     @MainActor
     init(from settings: SettingsManager, options: ExportOptions) {
         self.backgroundOpacity = settings.backgroundOpacity
@@ -768,6 +773,11 @@ struct CapturedSettings: Sendable {
         self.visualizerBarCount = settings.visualizerBarCount
         self.visualizerBarGap = settings.visualizerBarGap
         self.visualizerBarOpacity = settings.visualizerBarOpacity
+        self.colorBrightness = settings.colorBrightness
+        self.dialogCharacterName = settings.dialogCharacterName
+        self.dialogMaxWidth = settings.dialogMaxWidth
+        self.dialogMaxHeight = settings.dialogMaxHeight
+        self.dialogPosition = settings.dialogPosition
     }
 }
 
@@ -892,25 +902,30 @@ struct ExportableFullScreenViewStatic: View {
     let capturedSettings: CapturedSettings
     let backgroundImage: NSImage?
     let size: CGSize
-    
+
+    // Scale factor relative to 1080p reference resolution
+    private var scale: CGFloat {
+        size.height / 1080.0
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             // Background
             ZStack {
                 SettingsManager.background
-                
+
                 if let image = backgroundImage {
                     Image(nsImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: size.width, height: size.height)
                         .clipped()
-                        .blur(radius: capturedSettings.backgroundBlur)
+                        .blur(radius: capturedSettings.backgroundBlur * scale)
                         .opacity(capturedSettings.backgroundOpacity)
                 }
-                
+
                 Color.black.opacity(0.3)
-                
+
                 if capturedSettings.showParticles {
                     ExportableSnowfallViewStatic(
                         density: capturedSettings.particleDensity,
@@ -919,79 +934,97 @@ struct ExportableFullScreenViewStatic: View {
                     )
                 }
             }
-            
+
             // Centered lyrics
             if simulatedPlayer.hasLyrics {
-                if capturedSettings.lyricLinesVisible == 1 {
+                if capturedSettings.lyricLinesVisible == 4 {
+                    ExportableDialogLyricStatic(
+                        simulatedPlayer: simulatedPlayer,
+                        capturedSettings: capturedSettings,
+                        size: size,
+                        scale: scale
+                    )
+                } else if capturedSettings.lyricLinesVisible == 1 {
                     ExportableOneLineLyricStatic(
                         simulatedPlayer: simulatedPlayer,
-                        fontSize: capturedSettings.lyricFontSize
+                        fontSize: capturedSettings.lyricFontSize * scale,
+                        colorBrightness: capturedSettings.colorBrightness
                     )
                 } else {
                     ExportableSmoothLyricsStatic(
                         simulatedPlayer: simulatedPlayer,
-                        fontSize: capturedSettings.lyricFontSize,
+                        fontSize: capturedSettings.lyricFontSize * scale,
                         visibleRange: capturedSettings.lyricLinesVisible,
-                        containerHeight: size.height
+                        containerHeight: size.height,
+                        colorBrightness: capturedSettings.colorBrightness
                     )
                 }
             }
-            
-            // Track info at top left
+
+            // Track info at top left - all sizes scaled to resolution
             if capturedSettings.showTrackTitle && !simulatedPlayer.audioFileName.isEmpty {
+                let ringSize: CGFloat = 32 * scale
+                let titleFontSize: CGFloat = 14 * scale
+                let timeFontSize: CGFloat = 11 * scale
+                let iconSize: CGFloat = 9 * scale
+                let strokeWidth: CGFloat = 2 * scale
+                let spacing: CGFloat = 12 * scale
+                let padding: CGFloat = 24 * scale
+
                 VStack {
-                    HStack(alignment: .center, spacing: 12) {
+                    HStack(alignment: .center, spacing: spacing) {
                         ZStack {
                             Circle()
-                                .stroke(Color.white.opacity(0.15), lineWidth: 2)
-                                .frame(width: 32, height: 32)
-                            
+                                .stroke(Color.white.opacity(0.15), lineWidth: strokeWidth)
+                                .frame(width: ringSize, height: ringSize)
+
                             Circle()
                                 .trim(from: 0, to: simulatedPlayer.progress)
-                                .stroke(Color.white.opacity(0.8), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                                .frame(width: 32, height: 32)
+                                .stroke(Color.white.opacity(0.8), style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round))
+                                .frame(width: ringSize, height: ringSize)
                                 .rotationEffect(.degrees(-90))
-                            
+
                             Image(systemName: "play.fill")
-                                .font(.system(size: 9))
+                                .font(.system(size: iconSize))
                                 .foregroundColor(.white.opacity(0.8))
                         }
-                        
-                        VStack(alignment: .leading, spacing: 2) {
+
+                        VStack(alignment: .leading, spacing: 2 * scale) {
                             Text(simulatedPlayer.audioFileName)
-                                .font(.system(size: 14, weight: .medium, design: .default))
+                                .font(.system(size: titleFontSize, weight: .medium, design: .default))
                                 .foregroundColor(.white.opacity(0.8))
-                            
+
                             Text(formatTime(simulatedPlayer.currentTime) + " / " + formatTime(simulatedPlayer.duration))
-                                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                .font(.system(size: timeFontSize, weight: .medium, design: .monospaced))
                                 .foregroundColor(.white.opacity(0.4))
                         }
-                        
+
                         Spacer()
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 20)
-                    
+                    .padding(.horizontal, padding)
+                    .padding(.top, 20 * scale)
+
                     Spacer()
                 }
             }
-            
-            // Audio Visualizer
+
+            // Audio Visualizer - scale bar dimensions to resolution
             if capturedSettings.showVisualizer {
                 ExportableVisualizerViewStatic(
                     simulatedPlayer: simulatedPlayer,
-                    barWidth: capturedSettings.visualizerBarWidth,
+                    barWidth: capturedSettings.visualizerBarWidth * scale,
                     barCount: capturedSettings.visualizerBarCount,
-                    barGap: capturedSettings.visualizerBarGap,
-                    barOpacity: capturedSettings.visualizerBarOpacity
+                    barGap: capturedSettings.visualizerBarGap * scale,
+                    barOpacity: capturedSettings.visualizerBarOpacity,
+                    maxBarHeight: 60 * scale
                 )
-                .padding(.horizontal, 24)
-                .padding(.bottom, 12)
+                .padding(.horizontal, 24 * scale)
+                .padding(.bottom, 12 * scale)
             }
         }
         .frame(width: size.width, height: size.height)
     }
-    
+
     private func formatTime(_ time: TimeInterval) -> String {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
@@ -1058,33 +1091,58 @@ struct ExportableSnowfallViewStatic: View {
 struct ExportableOneLineLyricStatic: View {
     let simulatedPlayer: SimulatedAudioPlayer
     let fontSize: CGFloat
-    
+    let colorBrightness: Double
+
     var body: some View {
         VStack {
             Spacer()
-            
+
             if let lyric = simulatedPlayer.oneLineModeLyric {
-                VStack(spacing: 10) {
-                    Text(lyric.mainText.uppercased())
-                        .font(.custom("MollenTrial-Bold", size: fontSize * 1.3))
+                VStack(spacing: fontSize * 0.2) {
+                    if lyric.hasStyles {
+                        lyric.styledMainText.attributedText(
+                            font: .custom("MollenTrial-Bold", size: fontSize * 1.3),
+                            brightness: colorBrightness,
+                            uppercased: true
+                        )
                         .fontWeight(.bold)
-                        .foregroundColor(.white)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                         .minimumScaleFactor(0.5)
-                    
-                    if let background = lyric.backgroundText {
-                        Text(background.uppercased())
-                            .font(.custom("MollenTrial-Bold", size: fontSize * 0.85))
-                            .foregroundColor(.white.opacity(0.5))
+                    } else {
+                        Text(lyric.mainText.uppercased())
+                            .font(.custom("MollenTrial-Bold", size: fontSize * 1.3))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.5)
+                    }
+
+                    if let styledBg = lyric.styledBackgroundText {
+                        if styledBg.hasStyles {
+                            styledBg.attributedText(
+                                font: .custom("MollenTrial-Bold", size: fontSize * 0.85),
+                                opacity: 0.5,
+                                brightness: colorBrightness,
+                                uppercased: true
+                            )
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
+                        } else {
+                            Text(styledBg.plainText.uppercased())
+                                .font(.custom("MollenTrial-Bold", size: fontSize * 0.85))
+                                .foregroundColor(.white.opacity(0.5))
+                                .multilineTextAlignment(.center)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                        }
                     }
                 }
-                .padding(.horizontal, 60)
+                .padding(.horizontal, fontSize * 1.25)
             }
-            
+
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1096,13 +1154,13 @@ struct ExportableSmoothLyricsStatic: View {
     let fontSize: CGFloat
     let visibleRange: Int
     let containerHeight: CGFloat
-    
-    private let lineSpacing: CGFloat = 24
-    
+    let colorBrightness: Double
+
+    private var lineSpacing: CGFloat { fontSize * 0.42 }
     private var adjustedFontSize: CGFloat { fontSize * 1.2 }
     private var lineHeight: CGFloat { adjustedFontSize * 2.0 }
     private var totalLineHeight: CGFloat { lineHeight + lineSpacing }
-    
+
     var body: some View {
         ZStack {
             ForEach(-visibleRange...visibleRange, id: \.self) { offset in
@@ -1110,8 +1168,8 @@ struct ExportableSmoothLyricsStatic: View {
                 if index >= 0 && index < simulatedPlayer.lyrics.count {
                     let lyric = simulatedPlayer.lyrics[index]
                     let relativeOffset = CGFloat(offset)
-                    
-                    lyricLine(text: lyric.text, secondaryText: lyric.secondaryText, relativePosition: relativeOffset)
+
+                    lyricLine(lyric: lyric, relativePosition: relativeOffset)
                         .frame(minHeight: lineHeight)
                         .offset(y: relativeOffset * totalLineHeight)
                 }
@@ -1119,35 +1177,151 @@ struct ExportableSmoothLyricsStatic: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
-        .padding(.horizontal, 60)
+        .padding(.horizontal, fontSize * 1.25)
     }
-    
+
     @ViewBuilder
-    private func lyricLine(text: String, secondaryText: String?, relativePosition: CGFloat) -> some View {
+    private func lyricLine(lyric: Lyric, relativePosition: CGFloat) -> some View {
         let distance = abs(relativePosition)
         let isActive = distance < 0.5
         let opacity = distance < 0.1 ? 1.0 : max(0.06, 0.35 - (distance / max(CGFloat(visibleRange), 1)) * 0.2)
         let scale = distance < 0.1 ? 1.0 : max(0.72, 0.9 - (distance / max(CGFloat(visibleRange), 1)) * 0.12)
-        
-        VStack(spacing: 6) {
-            Text(text)
-                .font(.system(size: isActive ? adjustedFontSize * 1.08 : adjustedFontSize * 0.85, weight: isActive ? .heavy : .bold))
+        let mainSize: CGFloat = isActive ? adjustedFontSize * 1.08 : adjustedFontSize * 0.85
+        let mainWeight: Font.Weight = isActive ? .heavy : .bold
+        let secondarySize: CGFloat = isActive ? adjustedFontSize * 0.8 : adjustedFontSize * 0.65
+        let secondaryWeight: Font.Weight = isActive ? .semibold : .medium
+
+        VStack(spacing: fontSize * 0.1) {
+            if lyric.styledText.hasStyles {
+                lyric.styledText.attributedText(
+                    font: .system(size: mainSize, weight: mainWeight),
+                    opacity: opacity,
+                    brightness: colorBrightness
+                )
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
-                .foregroundColor(.white.opacity(opacity))
-            
-            if let secondary = secondaryText {
-                Text(secondary)
-                    .font(.system(size: isActive ? adjustedFontSize * 0.8 : adjustedFontSize * 0.65, weight: isActive ? .semibold : .medium))
+            } else {
+                Text(lyric.text)
+                    .font(.system(size: mainSize, weight: mainWeight))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                    .foregroundColor(.white.opacity(opacity))
+            }
+
+            if let styledSecondary = lyric.styledSecondaryText {
+                if styledSecondary.hasStyles {
+                    styledSecondary.attributedText(
+                        font: .system(size: secondarySize, weight: secondaryWeight),
+                        opacity: opacity * 0.6,
+                        brightness: colorBrightness
+                    )
                     .multilineTextAlignment(.center)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                    .foregroundColor(.white.opacity(opacity * 0.6))
+                } else {
+                    Text(styledSecondary.plainText)
+                        .font(.system(size: secondarySize, weight: secondaryWeight))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .foregroundColor(.white.opacity(opacity * 0.6))
+                }
             }
         }
         .scaleEffect(scale)
         .frame(maxWidth: .infinity)
+    }
+}
+
+struct ExportableDialogLyricStatic: View {
+    let simulatedPlayer: SimulatedAudioPlayer
+    let capturedSettings: CapturedSettings
+    let size: CGSize
+    let scale: CGFloat
+
+    private var displayName: String {
+        capturedSettings.dialogCharacterName.isEmpty ? "CHARACTER" : capturedSettings.dialogCharacterName
+    }
+
+    var body: some View {
+        let fontSize = capturedSettings.lyricFontSize * scale * 0.85
+        let dialogMaxWidth = size.width * capturedSettings.dialogMaxWidth
+        let dialogMaxHeight = size.height * capturedSettings.dialogMaxHeight
+        let horizontalMargin = (size.width - dialogMaxWidth) / 2
+        let nameTagFontSize = max(11 * scale, min(14 * scale, size.width * 0.012))
+        let topSpacerHeight = size.height * capturedSettings.dialogPosition - (dialogMaxHeight / 2)
+
+        VStack {
+            Spacer().frame(height: max(0, topSpacerHeight))
+
+            HStack {
+                Spacer(minLength: max(horizontalMargin, 24 * scale))
+
+                VStack(alignment: .leading, spacing: 0) {
+                    // Character name tag
+                    HStack {
+                        Text(displayName.uppercased())
+                            .font(.custom("MollenTrial-Bold", size: nameTagFontSize))
+                            .tracking(2 * scale)
+                            .foregroundColor(.white.opacity(0.95))
+                            .padding(.horizontal, 14 * scale)
+                            .padding(.vertical, 6 * scale)
+                            .background(Rectangle().fill(Color.white.opacity(0.12)))
+                            .overlay(Rectangle().stroke(Color.white.opacity(0.3), lineWidth: 2 * scale))
+                            .offset(x: -2 * scale, y: -1 * scale)
+                        Spacer()
+                    }
+                    .offset(y: 1 * scale)
+
+                    // Dialog box
+                    VStack(spacing: 0) {
+                        if let lyric = simulatedPlayer.oneLineModeLyric {
+                            if lyric.hasStyles {
+                                lyric.styledMainText.attributedText(
+                                    font: .custom("MollenTrial-Bold", size: fontSize),
+                                    brightness: capturedSettings.colorBrightness,
+                                    uppercased: true
+                                )
+                                .multilineTextAlignment(.center)
+                                .lineLimit(4)
+                                .minimumScaleFactor(0.5)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity)
+                            } else {
+                                Text(lyric.mainText.uppercased())
+                                    .font(.custom("MollenTrial-Bold", size: fontSize))
+                                    .foregroundColor(.white)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(4)
+                                    .minimumScaleFactor(0.5)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity)
+                            }
+                        } else {
+                            Text("...")
+                                .font(.custom("MollenTrial-Bold", size: fontSize))
+                                .foregroundColor(.white.opacity(0.3))
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .padding(.horizontal, 32 * scale)
+                    .padding(.vertical, 20 * scale)
+                    .frame(maxWidth: dialogMaxWidth, maxHeight: dialogMaxHeight)
+                    .background(
+                        Rectangle().fill(Color.black.opacity(0.65))
+                            .overlay(Rectangle().stroke(Color.white.opacity(0.35), lineWidth: 3 * scale))
+                            .overlay(Rectangle().stroke(Color.white.opacity(0.08), lineWidth: 1 * scale).padding(4 * scale))
+                    )
+                }
+                .frame(maxWidth: dialogMaxWidth)
+
+                Spacer(minLength: max(horizontalMargin, 24 * scale))
+            }
+
+            Spacer()
+        }
     }
 }
 
@@ -1157,8 +1331,8 @@ struct ExportableVisualizerViewStatic: View {
     let barCount: Int
     let barGap: CGFloat
     let barOpacity: Double
-    
-    private let maxBarHeight: CGFloat = 60
+    var maxBarHeight: CGFloat = 60
+
     private let minBarHeight: CGFloat = 2
     
     var body: some View {

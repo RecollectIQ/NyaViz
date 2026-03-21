@@ -7,6 +7,7 @@ import Foundation
 import AVFoundation
 import Accelerate
 import Combine
+import AppKit
 
 @MainActor
 class AudioPlayerManager: ObservableObject {
@@ -21,6 +22,35 @@ class AudioPlayerManager: ObservableObject {
     @Published var showSRTPicker = false
     @Published var isLooping = true
     @Published var volume: Float = 0.8
+
+    /// Directives parsed from the currently loaded `.nyaviz` file.
+    @Published var directives: [NyaVizDirective] = []
+
+    /// Weak reference to the app's SettingsManager so directives can mutate display settings
+    /// without creating a retain cycle. Set this immediately after creating the manager.
+    weak var settingsRef: SettingsManager?
+
+    /// Base directory of the currently loaded `.nyaviz` file, used to resolve relative paths
+    /// in `background:` directives.
+    private var nyavizBaseDirectory: URL?
+
+    /// Whether we are currently accessing a security-scoped resource for the base directory.
+    private var isAccessingSecurityScope = false
+
+    /// Pre-loaded images keyed by filename, loaded at parse time with sandbox access.
+    private var preloadedImages: [String: NSImage] = [:]
+
+    /// The index of the last directive that was applied, used to avoid re-applying the same
+    /// directive on every timer tick.
+    private var lastAppliedDirectiveIndex: Int = -1
+
+    /// Snapshot of user settings before any directives were applied, so we can restore them
+    /// when the song ends or a new file is loaded.
+    private struct SavedSettings {
+        let lyricLinesVisible: Int
+        let backgroundImage: NSImage?
+    }
+    private var savedSettings: SavedSettings?
     
     // Frequency bands for visualizer (normalized 0-1)
     @Published var frequencyBands: [Float] = Array(repeating: 0, count: 128)
@@ -127,13 +157,53 @@ class AudioPlayerManager: ObservableObject {
         }
     }
     
-    /// Load lyrics from SRT or NyaViz format files
+    /// Load lyrics (and any inline directives) from SRT or NyaViz format files.
     func loadSRT(from url: URL) {
-        lyrics = SubtitleLoader.load(from: url)
+        // Restore previous user settings before loading new directives
+        restoreUserSettings()
+
+        let result = SubtitleLoader.loadWithDirectives(from: url)
+        lyrics = result.lyrics
+        directives = result.directives
+        lastAppliedDirectiveIndex = -1
+        preloadedImages = [:]
+
+        // Release any previous security-scoped access
+        if isAccessingSecurityScope, let oldBase = nyavizBaseDirectory {
+            oldBase.stopAccessingSecurityScopedResource()
+            isAccessingSecurityScope = false
+        }
+
+        // Store the base directory
+        if url.pathExtension.lowercased() == "nyaviz" {
+            nyavizBaseDirectory = url.deletingLastPathComponent()
+        } else {
+            nyavizBaseDirectory = nil
+        }
+
+        // If there are background directives, prompt user for folder access and pre-load images
+        let backgroundPaths = directives.compactMap { directive -> String? in
+            if case .background(let path) = directive.type { return path }
+            return nil
+        }
+        let uniquePaths = Set(backgroundPaths)
+        if !uniquePaths.isEmpty {
+            preloadBackgroundImages(paths: uniquePaths, fallbackDir: url.deletingLastPathComponent())
+        }
+
+        // Snapshot user settings before directives override them
+        if !directives.isEmpty, let settings = settingsRef {
+            savedSettings = SavedSettings(
+                lyricLinesVisible: settings.lyricLinesVisible,
+                backgroundImage: settings.backgroundImage
+            )
+        }
+
         currentLyricIndex = -1
         updateCurrentLyric()
+
         let formatName = url.pathExtension.lowercased() == "nyaviz" ? "NyaViz" : "SRT"
-        print("Loaded \(lyrics.count) lyrics from \(formatName)")
+        print("Loaded \(lyrics.count) lyrics and \(directives.count) directives from \(formatName)")
     }
     
     func play() {
@@ -248,12 +318,21 @@ class AudioPlayerManager: ObservableObject {
         audioEngine?.stop()
         audioEngine = nil
         playerNode = nil
-        
+
         isPlaying = false
         currentTime = 0
         seekOffset = 0  // Reset offset
         stopTimer()
-        
+
+        // Restore user settings that were overridden by directives
+        restoreUserSettings()
+
+        // Release security-scoped access
+        if isAccessingSecurityScope, let base = nyavizBaseDirectory {
+            base.stopAccessingSecurityScopedResource()
+            isAccessingSecurityScope = false
+        }
+
         // Reset frequency bands
         smoothedBands = Array(repeating: 0, count: 128)
         frequencyBands = smoothedBands
@@ -269,15 +348,20 @@ class AudioPlayerManager: ObservableObject {
     
     func seek(to time: TimeInterval) {
         let wasPlaying = isPlaying
-        
+
         if wasPlaying {
             playerNode?.stop()
         }
-        
+
         currentTime = max(0, min(time, duration))
         seekOffset = currentTime
+
+        // Reset directive tracking so directives are re-evaluated from the new position.
+        // This handles seeking backwards: directives after the new position must not remain
+        // applied, and directives up to the new position need to be re-applied fresh.
+        lastAppliedDirectiveIndex = -1
         updateCurrentLyric()
-        
+
         if wasPlaying {
             scheduleAudio(from: currentTime)
             playerNode?.play()
@@ -449,7 +533,7 @@ class AudioPlayerManager: ObservableObject {
     
     private func updateCurrentLyric() {
         let time = currentTime
-        
+
         // Check if we're strictly within a lyric's time range
         if let index = lyrics.firstIndex(where: { time >= $0.startTime && time < $0.endTime }) {
             if currentLyricIndex != index {
@@ -475,8 +559,126 @@ class AudioPlayerManager: ObservableObject {
                 isWithinLyricTimeRange = false
             }
         }
+
+        applyPendingDirectives()
     }
-    
+
+    /// Check whether any directives should fire at the current playback position and apply them.
+    ///
+    /// Only directives whose timestamps are at or before `currentTime` and that have not yet
+    /// been applied (tracked by `lastAppliedDirectiveIndex`) are processed. When the user
+    /// seeks backwards, `seek(to:)` resets `lastAppliedDirectiveIndex` so earlier directives
+    /// are re-evaluated.
+    ///
+    /// Settings mutations are deferred to avoid "Publishing changes from within view updates".
+    private func applyPendingDirectives() {
+        guard !directives.isEmpty, let settings = settingsRef else { return }
+        let time = currentTime
+
+        // Find the index of the last directive whose time is <= currentTime
+        var targetIndex = -1
+        for (i, directive) in directives.enumerated() {
+            if directive.time <= time {
+                targetIndex = i
+            } else {
+                break // directives are sorted by time
+            }
+        }
+
+        guard targetIndex > lastAppliedDirectiveIndex else { return }
+
+        // Collect directives to apply
+        let toApply = ((lastAppliedDirectiveIndex + 1)...targetIndex).map { directives[$0] }
+        lastAppliedDirectiveIndex = targetIndex
+
+        // Defer settings mutations to the next run-loop tick to avoid
+        // "Publishing changes from within view updates" warnings
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            for directive in toApply {
+                self.apply(directive: directive, settings: settings)
+            }
+        }
+    }
+
+    /// Apply a single directive's effect to the app's settings.
+    private func apply(directive: NyaVizDirective, settings: SettingsManager) {
+        switch directive.type {
+        case .mode(let modeName):
+            switch modeName {
+            case "minimal":
+                settings.lyricLinesVisible = 1
+            case "dialog":
+                settings.lyricLinesVisible = 4
+            default:
+                break
+            }
+
+        case .background(let path):
+            // Use pre-loaded cache first, fall back to direct file access
+            if let image = preloadedImages[path] {
+                settings.backgroundImage = image
+            } else {
+                let imageURL: URL
+                if let base = nyavizBaseDirectory {
+                    imageURL = base.appendingPathComponent(path)
+                } else {
+                    imageURL = URL(fileURLWithPath: path)
+                }
+                if let image = NSImage(contentsOf: imageURL) {
+                    settings.backgroundImage = image
+                } else {
+                    print("[Directive] ERROR: Could not load background image: \(path)")
+                }
+            }
+        }
+    }
+
+    /// Pre-load all background images referenced by directives.
+    /// Shows an NSOpenPanel for the folder so the sandbox grants read access to sibling files.
+    private func preloadBackgroundImages(paths: Set<String>, fallbackDir: URL) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "Grant access to the folder containing background images"
+        panel.prompt = "Grant Access"
+        panel.directoryURL = fallbackDir
+
+        guard panel.runModal() == .OK, let folderURL = panel.url else {
+            print("[Directive] User denied folder access, background images won't load")
+            return
+        }
+
+        // Start security-scoped access
+        let accessGranted = folderURL.startAccessingSecurityScopedResource()
+        if accessGranted {
+            nyavizBaseDirectory = folderURL
+            isAccessingSecurityScope = true
+        }
+
+        for path in paths {
+            let imageURL = folderURL.appendingPathComponent(path)
+            if let image = NSImage(contentsOf: imageURL) {
+                preloadedImages[path] = image
+                print("[Directive] Pre-loaded image: \(path)")
+            } else {
+                print("[Directive] WARNING: Could not pre-load image: \(imageURL.path)")
+            }
+        }
+    }
+
+    /// Restore user settings that were saved before directives were applied.
+    private func restoreUserSettings() {
+        guard let saved = savedSettings, let settings = settingsRef else { return }
+        settings.lyricLinesVisible = saved.lyricLinesVisible
+        if let bg = saved.backgroundImage {
+            settings.backgroundImage = bg
+        }
+        savedSettings = nil
+        lastAppliedDirectiveIndex = -1
+    }
+
     // MARK: - One-Line Mode Helpers (with merged background vocals)
     
     /// Minimum duration for a lyric to be displayed (filters out flickering)

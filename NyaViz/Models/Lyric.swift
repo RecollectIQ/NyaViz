@@ -162,59 +162,169 @@ struct SRTParser {
     }
 }
 
+// MARK: - NyaViz Directives
+
+/// A directive that changes display settings at a specific playback time.
+///
+/// Directives appear in `.nyaviz` files as single-line blocks between subtitle blocks:
+/// ```
+/// !00:01:30,000 mode:minimal
+/// !00:02:00,000 mode:dialog
+/// !00:02:30,000 background:image2.jpg
+/// ```
+struct NyaVizDirective {
+    /// The type of action this directive performs.
+    enum DirectiveType: Equatable {
+        /// Switch the lyric display mode. Valid values: `"minimal"` (1 line) or `"dialog"` (4 lines).
+        case mode(String)
+        /// Load a new background image. The value is a filename or path relative to the `.nyaviz` file.
+        case background(String)
+    }
+
+    /// The playback time at which this directive fires, in seconds.
+    let time: TimeInterval
+    /// The action to perform when this directive fires.
+    let type: DirectiveType
+}
+
+// MARK: - NyaViz Parse Result
+
+/// The combined output of a full NyaViz file parse, containing both lyrics and directives.
+struct NyaVizParseResult {
+    /// All subtitle entries parsed from the file.
+    let lyrics: [Lyric]
+    /// All inline directives parsed from the file, sorted by time.
+    let directives: [NyaVizDirective]
+}
+
 // MARK: - NyaViz Parser (Extended format with styling)
 
 struct NyaVizParser {
-    
+
     /// Parse NyaViz format content
     /// Supports color markers: [#RRGGBB]text[/] or [color:name]text[/]
     /// Supports bold: [b]text[/b] or [bold]text[/bold]
     /// Supports italic: [i]text[/i] or [italic]text[/italic]
+    /// Supports directives: `!HH:MM:SS,mmm mode:minimal`, `!HH:MM:SS,mmm background:file.jpg`
     static func parse(_ content: String) -> [Lyric] {
+        parseWithDirectives(content).lyrics
+    }
+
+    /// Parse NyaViz format content and return both lyrics and directives.
+    ///
+    /// Directive lines begin with `!` followed by a timestamp and a directive body:
+    /// ```
+    /// !00:01:30,000 mode:minimal
+    /// !00:02:00,000 mode:dialog
+    /// !00:02:30,000 background:path/to/image.jpg
+    /// ```
+    /// Valid mode values are `minimal` (sets 1 visible line) and `dialog` (sets 4 visible lines).
+    /// Background values are filenames or paths resolved relative to the `.nyaviz` file's directory.
+    ///
+    /// Files without any directive lines are fully backwards-compatible.
+    static func parseWithDirectives(_ content: String) -> NyaVizParseResult {
         var lyrics: [Lyric] = []
-        
+        var directives: [NyaVizDirective] = []
+
         // Normalize line endings
         let normalizedContent = content
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
             .trimmingCharacters(in: CharacterSet(charactersIn: "\u{FEFF}"))
-        
+
         // Split by double newlines
         let blocks = normalizedContent.components(separatedBy: "\n\n")
-        
+
         for block in blocks {
             let trimmedBlock = block.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedBlock.isEmpty else { continue }
-            
-            let lines = trimmedBlock.components(separatedBy: "\n").map { 
-                $0.trimmingCharacters(in: .whitespaces) 
+
+            // Split block into lines
+            let blockLines = trimmedBlock.components(separatedBy: "\n").map {
+                $0.trimmingCharacters(in: .whitespaces)
             }.filter { !$0.isEmpty }
-            
-            guard lines.count >= 2 else { continue }
-            
+
+            // A directive block: all lines start with '!'
+            // This handles single directives and consecutive directives in one block
+            if blockLines.allSatisfy({ $0.hasPrefix("!") }) {
+                for directiveLine in blockLines {
+                    if let directive = parseDirectiveLine(directiveLine) {
+                        directives.append(directive)
+                    }
+                }
+                continue
+            }
+
+            // Otherwise treat as a normal subtitle block
+            guard blockLines.count >= 2 else { continue }
+
             // Find the timestamp line
-            guard let timestampLineIndex = lines.firstIndex(where: { $0.contains("-->") }) else { continue }
-            let timestampLine = lines[timestampLineIndex]
-            
+            guard let timestampLineIndex = blockLines.firstIndex(where: { $0.contains("-->") }) else { continue }
+            let timestampLine = blockLines[timestampLineIndex]
+
             let arrowPattern = timestampLine.contains(" --> ") ? " --> " : "-->"
             let timestamps = timestampLine.components(separatedBy: arrowPattern)
-            
+
             guard timestamps.count == 2,
                   let startTime = TimestampParser.parse(timestamps[0]),
                   let endTime = TimestampParser.parse(timestamps[1]) else { continue }
-            
+
             // Get text lines and parse styling
-            let textLines = lines.dropFirst(timestampLineIndex + 1)
+            let textLines = blockLines.dropFirst(timestampLineIndex + 1)
             let rawText = textLines.joined(separator: " ")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            
+
             if !rawText.isEmpty {
                 let styledLine = parseStyledLine(rawText)
                 lyrics.append(Lyric(startTime: startTime, endTime: endTime, styledText: styledLine))
             }
         }
-        
-        return LyricMerger.mergeStyled(lyrics)
+
+        let mergedLyrics = LyricMerger.mergeStyled(lyrics)
+        let sortedDirectives = directives.sorted { $0.time < $1.time }
+        return NyaVizParseResult(lyrics: mergedLyrics, directives: sortedDirectives)
+    }
+
+    // MARK: - Directive Parsing
+
+    /// Parse a single directive line of the form `!HH:MM:SS,mmm type:value`.
+    ///
+    /// Returns `nil` for lines that cannot be parsed (malformed timestamp, unknown type, etc.).
+    /// Whitespace around the timestamp and body is tolerated.
+    private static func parseDirectiveLine(_ line: String) -> NyaVizDirective? {
+        // Strip leading '!'
+        let body = String(line.dropFirst()).trimmingCharacters(in: .whitespaces)
+        guard !body.isEmpty else { return nil }
+
+        // Split on first whitespace to separate the timestamp from the directive body
+        let separatorIndex = body.firstIndex(where: { $0.isWhitespace })
+        guard let sepIdx = separatorIndex else { return nil }
+
+        let timestampPart = String(body[body.startIndex..<sepIdx]).trimmingCharacters(in: .whitespaces)
+        let directivePart = String(body[body.index(after: sepIdx)...]).trimmingCharacters(in: .whitespaces)
+
+        guard let time = TimestampParser.parse(timestampPart), !directivePart.isEmpty else { return nil }
+
+        // directivePart has the form "key:value"
+        guard let colonIndex = directivePart.firstIndex(of: ":") else { return nil }
+        let key = String(directivePart[directivePart.startIndex..<colonIndex])
+            .trimmingCharacters(in: .whitespaces)
+            .lowercased()
+        let value = String(directivePart[directivePart.index(after: colonIndex)...])
+            .trimmingCharacters(in: .whitespaces)
+
+        guard !value.isEmpty else { return nil }
+
+        switch key {
+        case "mode":
+            let normalized = value.lowercased()
+            guard normalized == "minimal" || normalized == "dialog" else { return nil }
+            return NyaVizDirective(time: time, type: .mode(normalized))
+        case "background":
+            return NyaVizDirective(time: time, type: .background(value))
+        default:
+            return nil
+        }
     }
     
     /// Parse a line of text with style markers into StyledLine
@@ -525,42 +635,56 @@ extension SRTParser {
 
 extension NyaVizParser {
     static func load(from url: URL) -> [Lyric] {
+        loadWithDirectives(from: url).lyrics
+    }
+
+    /// Load a `.nyaviz` file and return both lyrics and directives.
+    static func loadWithDirectives(from url: URL) -> NyaVizParseResult {
         let encodings: [String.Encoding] = [.utf8, .utf16, .isoLatin1, .windowsCP1252, .ascii]
-        
+
         for encoding in encodings {
             if let content = try? String(contentsOf: url, encoding: encoding) {
-                let lyrics = parse(content)
-                if !lyrics.isEmpty {
-                    return lyrics
+                let result = parseWithDirectives(content)
+                // Only accept the result if it produced at least one lyric or directive;
+                // this mirrors the existing behaviour of the plain load(from:) method.
+                if !result.lyrics.isEmpty || !result.directives.isEmpty {
+                    return result
                 }
             }
         }
-        
+
         if let data = try? Data(contentsOf: url),
-           let content = String(data: data, encoding: .utf8) ?? 
+           let content = String(data: data, encoding: .utf8) ??
                          String(data: data, encoding: .isoLatin1) {
-            return parse(content)
+            return parseWithDirectives(content)
         }
-        
-        return []
+
+        return NyaVizParseResult(lyrics: [], directives: [])
     }
 }
 
 // MARK: - Unified Subtitle Loader
 
 struct SubtitleLoader {
-    /// Load subtitles from a file, automatically detecting format by extension
+    /// Load subtitles from a file, automatically detecting format by extension.
     static func load(from url: URL) -> [Lyric] {
+        loadWithDirectives(from: url).lyrics
+    }
+
+    /// Load subtitles and directives from a file, automatically detecting format by extension.
+    ///
+    /// Only `.nyaviz` files can contain directives; `.srt` files always return an empty
+    /// directives array.
+    static func loadWithDirectives(from url: URL) -> NyaVizParseResult {
         let ext = url.pathExtension.lowercased()
-        
+
         switch ext {
         case "nyaviz":
-            return NyaVizParser.load(from: url)
+            return NyaVizParser.loadWithDirectives(from: url)
         case "srt":
-            return SRTParser.load(from: url)
+            return NyaVizParseResult(lyrics: SRTParser.load(from: url), directives: [])
         default:
-            // Try SRT parser as fallback
-            return SRTParser.load(from: url)
+            return NyaVizParseResult(lyrics: SRTParser.load(from: url), directives: [])
         }
     }
 }
