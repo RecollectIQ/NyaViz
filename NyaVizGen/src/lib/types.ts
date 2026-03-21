@@ -203,12 +203,20 @@ export function parseSRT(content: string): LyricLine[] {
     const textLines = blockLines.slice(timestampIdx + 1).filter(l => l.trim().length > 0);
     if (textLines.length === 0) continue;
 
-    // Strip HTML tags and ASS tags
+    // Strip HTML tags, ASS tags, and zero-width spaces
     const text = textLines
-      .map(l => l.replace(/<[^>]+>/g, '').replace(/\{\\[^}]+\}/g, '').trim())
+      .map(l => l.replace(/<[^>]+>/g, '').replace(/\{\\[^}]+\}/g, '').replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim())
       .join(' ');
 
     if (!text) continue;
+
+    // Merge with previous line if same text (karaoke-style SRT with many tiny entries)
+    const prev = lines[lines.length - 1];
+    if (prev && prev.text === text) {
+      // Extend the previous entry's end time
+      prev.endTime = endTime;
+      continue;
+    }
 
     lines.push({
       id: generateId(),
