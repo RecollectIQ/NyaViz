@@ -184,6 +184,29 @@ hdiutil create -volname "$APP_NAME" \
     -ov -format UDZO \
     "$DMG_OUTPUT"
 
+echo "✅ DMG created!"
+
+# Step 6: Notarize DMG
+echo ""
+echo "📤 Submitting DMG for notarization..."
+
+xcrun notarytool submit "$DMG_OUTPUT" \
+    --keychain-profile "NyaViz" \
+    --wait
+
+if [ $? -ne 0 ]; then
+    echo "❌ Notarization failed!"
+    exit 1
+fi
+
+echo "✅ Notarization succeeded!"
+
+# Step 7: Staple the notarization ticket
+echo ""
+echo "📎 Stapling notarization ticket..."
+
+xcrun stapler staple "$DMG_OUTPUT"
+
 echo ""
 echo "✅ Build complete!"
 echo "📍 DMG location: $DMG_OUTPUT"

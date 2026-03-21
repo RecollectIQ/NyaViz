@@ -169,6 +169,79 @@ export function formatTimeDisplay(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+// Parse SRT file content into LyricLines with timing
+export function parseSRT(content: string): LyricLine[] {
+  // Normalize line endings and remove BOM
+  const normalized = content.replace(/\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const blocks = normalized.split(/\n\n+/).filter(b => b.trim().length > 0);
+
+  const lines: LyricLine[] = [];
+
+  for (const block of blocks) {
+    const blockLines = block.trim().split('\n');
+
+    // Find the timestamp line (contains " --> ")
+    let timestampIdx = -1;
+    for (let i = 0; i < blockLines.length; i++) {
+      if (blockLines[i].includes('-->')) {
+        timestampIdx = i;
+        break;
+      }
+    }
+
+    if (timestampIdx === -1) continue;
+
+    // Parse timestamps
+    const timestampLine = blockLines[timestampIdx];
+    const match = timestampLine.match(/(\d{1,2}:?\d{2}:\d{2}[,\.]\d{3})\s*-->\s*(\d{1,2}:?\d{2}:\d{2}[,\.]\d{3})/);
+    if (!match) continue;
+
+    const startTime = parseSRTTimestamp(match[1]);
+    const endTime = parseSRTTimestamp(match[2]);
+
+    // Collect text lines after the timestamp
+    const textLines = blockLines.slice(timestampIdx + 1).filter(l => l.trim().length > 0);
+    if (textLines.length === 0) continue;
+
+    // Strip HTML tags and ASS tags
+    const text = textLines
+      .map(l => l.replace(/<[^>]+>/g, '').replace(/\{\\[^}]+\}/g, '').trim())
+      .join(' ');
+
+    if (!text) continue;
+
+    lines.push({
+      id: generateId(),
+      text,
+      words: parseWordsFromLine(text),
+      startTime,
+      endTime,
+    });
+  }
+
+  return lines;
+}
+
+// Parse SRT timestamp string to milliseconds
+function parseSRTTimestamp(ts: string): number {
+  // Replace comma with period for consistency
+  ts = ts.replace(',', '.');
+
+  const parts = ts.split(':');
+  let hours = 0, minutes = 0, seconds = 0;
+
+  if (parts.length === 3) {
+    hours = parseInt(parts[0], 10);
+    minutes = parseInt(parts[1], 10);
+    seconds = parseFloat(parts[2]);
+  } else if (parts.length === 2) {
+    minutes = parseInt(parts[0], 10);
+    seconds = parseFloat(parts[1]);
+  }
+
+  return Math.round((hours * 3600 + minutes * 60 + seconds) * 1000);
+}
+
 // Generate NyaViz file content
 export function generateNyaVizContent(lines: LyricLine[]): string {
   const timedLines = lines.filter(line => line.startTime !== null && line.endTime !== null);

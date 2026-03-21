@@ -9,9 +9,10 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { LyricsEditor } from '@/components/LyricsEditor';
 import { TimingControls } from '@/components/TimingControls';
 import { ExportPreview } from '@/components/ExportPreview';
-import { 
+import {
   LyricLine,
-  parseLyrics, 
+  parseLyrics,
+  parseSRT,
   generateNyaVizContent,
 } from '@/lib/types';
 
@@ -92,6 +93,24 @@ export default function Home() {
   const [showExportPreview, setShowExportPreview] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement>(null);
+  const srtInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportSRT = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const content = reader.result as string;
+      const parsed = parseSRT(content);
+      if (parsed.length > 0) {
+        setLines(parsed);
+        setMode('editor');
+      }
+    };
+    reader.readAsText(file);
+    // Reset so the same file can be re-imported
+    e.target.value = '';
+  }, []);
 
   const handleParseLyrics = useCallback(() => {
     if (rawLyrics.trim()) {
@@ -219,15 +238,34 @@ Violet dreams and golden seams`}
                 </CardContent>
               </Card>
 
-              <Button
-                onClick={handleParseLyrics}
-                disabled={!rawLyrics.trim()}
-                size="lg"
-                className="w-full h-14 text-lg btn-primary text-[var(--foreground)] disabled:opacity-30"
-              >
-                {Icons.arrow}
-                <span className="ml-2">Continue to Editor</span>
-              </Button>
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleParseLyrics}
+                  disabled={!rawLyrics.trim()}
+                  size="lg"
+                  className="flex-1 h-14 text-lg btn-primary text-[var(--foreground)] disabled:opacity-30"
+                >
+                  {Icons.arrow}
+                  <span className="ml-2">Continue to Editor</span>
+                </Button>
+
+                <Button
+                  onClick={() => srtInputRef.current?.click()}
+                  size="lg"
+                  variant="outline"
+                  className="h-14 text-lg border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--gray-800)]"
+                >
+                  {Icons.document}
+                  <span className="ml-2">Import .srt</span>
+                </Button>
+                <input
+                  ref={srtInputRef}
+                  type="file"
+                  accept=".srt"
+                  onChange={handleImportSRT}
+                  className="hidden"
+                />
+              </div>
 
               {/* Features Preview */}
               <div className="grid grid-cols-3 gap-4 pt-8">
