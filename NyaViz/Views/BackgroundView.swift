@@ -7,14 +7,32 @@ import SwiftUI
 
 struct BackgroundView: View {
     @EnvironmentObject var settings: SettingsManager
-    
+
+    // Track the previous image for crossfade
+    @State private var displayedImage: NSImage?
+    @State private var previousImage: NSImage?
+    @State private var crossfadeOpacity: Double = 1.0
+
     var body: some View {
         ZStack {
             // Base dark background
             SettingsManager.background
-            
-            // Background image
-            if let image = settings.backgroundImage {
+
+            // Previous image (fading out during crossfade)
+            if let prevImage = previousImage {
+                GeometryReader { geo in
+                    Image(nsImage: prevImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                        .blur(radius: settings.backgroundBlur)
+                        .opacity(settings.backgroundOpacity * (1.0 - crossfadeOpacity))
+                }
+            }
+
+            // Current background image (fading in)
+            if let image = displayedImage {
                 GeometryReader { geo in
                     Image(nsImage: image)
                         .resizable()
@@ -22,19 +40,31 @@ struct BackgroundView: View {
                         .frame(width: geo.size.width, height: geo.size.height)
                         .clipped()
                         .blur(radius: settings.backgroundBlur)
-                        .opacity(settings.backgroundOpacity)
+                        .opacity(settings.backgroundOpacity * crossfadeOpacity)
                 }
             }
-            
+
             // Dark overlay for better text contrast
             Color.black.opacity(0.3)
-            
+
             // Snowfall particles
             if settings.showParticles {
                 SnowfallView(density: settings.particleDensity)
             }
         }
         .ignoresSafeArea()
+        .onChange(of: settings.backgroundImage) { _, newValue in
+            guard newValue !== displayedImage else { return }
+            previousImage = displayedImage
+            displayedImage = newValue
+            crossfadeOpacity = 0
+            withAnimation(.easeInOut(duration: 0.8)) {
+                crossfadeOpacity = 1.0
+            }
+        }
+        .onAppear {
+            displayedImage = settings.backgroundImage
+        }
     }
 }
 

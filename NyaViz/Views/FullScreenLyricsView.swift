@@ -12,17 +12,19 @@ struct FullScreenLyricsView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
-                // Centered lyrics
+                // Centered lyrics with crossfade between modes
                 if audioPlayer.hasLyrics {
-                    if settings.lyricLinesVisible == 4 {
-                        // Dialog mode: game-style conversation overlay
-                        FullScreenGameDialogLyrics()
-                    } else if settings.lyricLinesVisible == 1 {
-                        // One-line mode: single centered lyric in Mollen Bold, all caps
-                        FullScreenOneLineLyric()
-                    } else {
-                        FullScreenSmoothLyrics(containerHeight: geo.size.height)
+                    Group {
+                        if settings.lyricLinesVisible == 4 {
+                            FullScreenGameDialogLyrics()
+                        } else if settings.lyricLinesVisible == 1 {
+                            FullScreenOneLineLyric()
+                        } else {
+                            FullScreenSmoothLyrics(containerHeight: geo.size.height)
+                        }
                     }
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.8), value: settings.lyricLinesVisible)
                 } else {
                     Image(systemName: "text.quote")
                         .font(.system(size: 64, weight: .ultraLight))

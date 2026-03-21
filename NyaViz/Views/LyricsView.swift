@@ -119,15 +119,17 @@ struct LyricsView: View {
         GeometryReader { geo in
             ZStack {
                 if audioPlayer.hasLyrics {
-                    if settings.lyricLinesVisible == 4 {
-                        // Dialog mode: game-style conversation overlay
-                        GameDialogLyricsView()
-                    } else if settings.lyricLinesVisible == 1 {
-                        // One-line mode: single centered lyric in Mollen Bold, all caps
-                        OneLineLyricView()
-                    } else {
-                        SmoothLyricsView(containerHeight: geo.size.height)
+                    Group {
+                        if settings.lyricLinesVisible == 4 {
+                            GameDialogLyricsView()
+                        } else if settings.lyricLinesVisible == 1 {
+                            OneLineLyricView()
+                        } else {
+                            SmoothLyricsView(containerHeight: geo.size.height)
+                        }
                     }
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.8), value: settings.lyricLinesVisible)
                 } else {
                     // Minimal empty state
                     Image(systemName: "text.quote")
