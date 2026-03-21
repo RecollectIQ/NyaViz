@@ -113,8 +113,10 @@ class AudioPlayerManager: ObservableObject {
         engine.mainMixerNode.outputVolume = volume
         
         // Install tap for FFT analysis
+        // Use nil format to match the mixer's native output format (hardware sample rate)
+        // Using the file's format here causes sample rate mismatch, degrading audio quality
         let bufferSize: AVAudioFrameCount = AVAudioFrameCount(fftSize)
-        engine.mainMixerNode.installTap(onBus: 0, bufferSize: bufferSize, format: format) { [weak self] buffer, _ in
+        engine.mainMixerNode.installTap(onBus: 0, bufferSize: bufferSize, format: nil) { [weak self] buffer, _ in
             self?.processAudioBuffer(buffer)
         }
         

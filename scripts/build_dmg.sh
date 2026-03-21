@@ -139,9 +139,11 @@ xcodebuild -project "$PROJECT_DIR/NyaViz.xcodeproj" \
     -derivedDataPath "$BUILD_DIR" \
     -archivePath "$BUILD_DIR/$APP_NAME.xcarchive" \
     archive \
-    CODE_SIGN_IDENTITY="-" \
-    CODE_SIGNING_REQUIRED=NO \
-    CODE_SIGNING_ALLOWED=NO
+    CODE_SIGN_IDENTITY="Developer ID Application: Yanfei Ding (55VR37C6LP)" \
+    CODE_SIGNING_REQUIRED=YES \
+    CODE_SIGNING_ALLOWED=YES \
+    DEVELOPMENT_TEAM="55VR37C6LP" \
+    CODE_SIGN_STYLE="Manual"
 
 echo "✅ Build completed!"
 
