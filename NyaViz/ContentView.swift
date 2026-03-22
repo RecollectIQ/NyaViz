@@ -10,15 +10,17 @@ import AppKit
 struct ContentView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
+    @EnvironmentObject var library: LibraryManager
     @State private var showControls = true
     @State private var controlsTimer: Timer?
     @State private var showSettingsButton = false
-    
+    @State private var showLibraryButton = false
+
     var body: some View {
         ZStack {
             // Background Layer
             BackgroundView()
-            
+
             // Main Content
             if settings.isFullScreen {
                 FullScreenLyricsView()
@@ -27,7 +29,7 @@ struct ContentView: View {
                 MainPlayerView()
                     .transition(.opacity)
             }
-            
+
             // Floating Controls (appear on hover in fullscreen)
             if settings.isFullScreen {
                 VStack {
@@ -38,13 +40,42 @@ struct ContentView: View {
                 }
                 .padding(.bottom, 40)
             }
-            
+
+            // Library Button (top left) - subtle, shows on hover, mirrors settings button
+            if !library.isDrawerExpanded {
+                VStack {
+                    HStack {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                library.isDrawerExpanded = true
+                            }
+                        }) {
+                            Image(systemName: "list.bullet")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white.opacity(0.25))
+                                .opacity(showLibraryButton ? 1 : 0)
+                        }
+                        .buttonStyle(.plain)
+                        .frame(width: 60, height: 60)
+                        .contentShape(Rectangle())
+                        .onHover { hovering in
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showLibraryButton = hovering
+                            }
+                        }
+
+                        Spacer()
+                    }
+                    Spacer()
+                }
+            }
+
             // Settings Button (top right) - hidden when panel is open, shows on hover
             if !settings.showSettings {
                 VStack {
                     HStack {
                         Spacer()
-                        
+
                         Button(action: { settings.showSettings.toggle() }) {
                             Image(systemName: "slider.horizontal.3")
                                 .font(.system(size: 16))
@@ -63,15 +94,18 @@ struct ContentView: View {
                     Spacer()
                 }
             }
-            
-            // Settings Panel
+
+            // Library Sidebar (left)
+            if library.isDrawerExpanded {
+                LibraryDrawerView()
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+
+            // Settings Panel (right)
             if settings.showSettings {
                 SettingsPanelView()
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
-
-            // Library drawer — visible in both normal and fullscreen modes
-            LibraryDrawerView()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onHover { hovering in
@@ -90,8 +124,9 @@ struct ContentView: View {
         }
         .animation(.easeInOut(duration: 0.4), value: settings.isFullScreen)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: settings.showSettings)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: library.isDrawerExpanded)
     }
-    
+
     private func resetControlsTimer() {
         controlsTimer?.invalidate()
         controlsTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: false) { _ in

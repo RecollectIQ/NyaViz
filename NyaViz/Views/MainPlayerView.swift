@@ -211,21 +211,21 @@ struct VerticalFloatingControls: View {
             }
             .buttonStyle(.plain)
             
-            // Seek back
-            Button(action: { audioPlayer.seekBackward(10) }) {
-                Image(systemName: "gobackward.10")
-                    .font(.system(size: 18))
+            // Previous song
+            Button(action: { audioPlayer.playPreviousSong() }) {
+                Image(systemName: "backward.fill")
+                    .font(.system(size: 14))
                     .foregroundColor(.white.opacity(0.5))
             }
             .buttonStyle(.plain)
-            
+
             // Play/Pause
             Button(action: { audioPlayer.togglePlayPause() }) {
                 ZStack {
                     Circle()
                         .fill(.white)
                         .frame(width: 44, height: 44)
-                    
+
                     Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 16))
                         .foregroundColor(.black)
@@ -233,15 +233,15 @@ struct VerticalFloatingControls: View {
                 }
             }
             .buttonStyle(.plain)
-            
-            // Seek forward
-            Button(action: { audioPlayer.seekForward(10) }) {
-                Image(systemName: "goforward.10")
-                    .font(.system(size: 18))
+
+            // Next song
+            Button(action: { audioPlayer.playNextSong() }) {
+                Image(systemName: "forward.fill")
+                    .font(.system(size: 14))
                     .foregroundColor(.white.opacity(0.5))
             }
             .buttonStyle(.plain)
-            
+
             // Fullscreen
             Button(action: { settings.isFullScreen = true }) {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
@@ -520,22 +520,22 @@ struct PlaybackControlsView: View {
     
     var body: some View {
         HStack(spacing: 32) {
-            // Seek Back
-            Button(action: { audioPlayer.seekBackward(10) }) {
-                Image(systemName: "gobackward.10")
-                    .font(.system(size: 20))
+            // Previous song
+            Button(action: { audioPlayer.playPreviousSong() }) {
+                Image(systemName: "backward.fill")
+                    .font(.system(size: 16))
                     .foregroundColor(SettingsManager.accentDim)
             }
             .buttonStyle(.plain)
             .keyboardShortcut(.leftArrow, modifiers: [])
-            
+
             // Play/Pause
             Button(action: { audioPlayer.togglePlayPause() }) {
                 ZStack {
                     Circle()
                         .fill(Color.white)
                         .frame(width: 56, height: 56)
-                    
+
                     Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 20))
                         .foregroundColor(SettingsManager.background)
@@ -544,11 +544,11 @@ struct PlaybackControlsView: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut(.space, modifiers: [])
-            
-            // Seek Forward
-            Button(action: { audioPlayer.seekForward(10) }) {
-                Image(systemName: "goforward.10")
-                    .font(.system(size: 20))
+
+            // Next song
+            Button(action: { audioPlayer.playNextSong() }) {
+                Image(systemName: "forward.fill")
+                    .font(.system(size: 16))
                     .foregroundColor(SettingsManager.accentDim)
             }
             .buttonStyle(.plain)

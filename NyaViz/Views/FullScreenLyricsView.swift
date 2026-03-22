@@ -371,11 +371,11 @@ struct FloatingControlsView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(videoExporter.isExporting)
-                
+
                 // Previous song
                 Button(action: { audioPlayer.playPreviousSong() }) {
                     Image(systemName: "backward.fill")
-                        .font(.system(size: 18))
+                        .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.5))
                 }
                 .buttonStyle(.plain)
@@ -400,17 +400,17 @@ struct FloatingControlsView: View {
                 // Next song
                 Button(action: { audioPlayer.playNextSong() }) {
                     Image(systemName: "forward.fill")
-                        .font(.system(size: 18))
+                        .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.5))
                 }
                 .buttonStyle(.plain)
                 .disabled(videoExporter.isExporting)
-                
+
                 // Divider
                 Rectangle()
                     .fill(Color.white.opacity(0.2))
                     .frame(width: 1, height: 20)
-                
+
                 // Export video button
                 Button(action: { startExport() }) {
                     Image(systemName: videoExporter.isExporting ? "arrow.clockwise" : "square.and.arrow.up")
@@ -422,7 +422,7 @@ struct FloatingControlsView: View {
                 .buttonStyle(.plain)
                 .disabled(videoExporter.isExporting || !audioPlayer.hasAudio)
                 .help("Export video")
-                
+
                 // Exit fullscreen
                 Button(action: { settings.isFullScreen = false }) {
                     Image(systemName: "arrow.down.right.and.arrow.up.left")

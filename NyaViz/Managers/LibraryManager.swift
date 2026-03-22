@@ -24,6 +24,9 @@ class LibraryManager: ObservableObject {
     /// The id of the entry that is currently loaded / playing, if any.
     @Published var currentEntryId: String?
 
+    /// Whether the library drawer is expanded (shared so other views can adjust layout).
+    @Published var isDrawerExpanded = false
+
     // MARK: - Paths
 
     /// Root directory for all library entries:

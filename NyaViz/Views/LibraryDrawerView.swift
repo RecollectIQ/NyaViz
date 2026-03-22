@@ -17,179 +17,82 @@ private func relativeLabel(for date: Date) -> String {
     return formatter.string(from: date)
 }
 
-// MARK: - Library Drawer View
+// MARK: - Library Sidebar View
 
-/// A slide-up bottom drawer that lists all entries in the song library.
-///
-/// The drawer always shows a controls bar (prev, play/pause, next, loop toggle)
-/// at the bottom of the screen. Tapping the pill handle expands the drawer to
-/// also reveal a scrollable song list below the controls bar.
+/// A left sidebar that lists all entries in the song library.
+/// Slides in from the left, matching the settings panel on the right.
 struct LibraryDrawerView: View {
 
     @EnvironmentObject var library: LibraryManager
     @EnvironmentObject var audioPlayer: AudioPlayerManager
 
-    @State private var isExpanded = false
-
-    // Height of the scrollable song list portion (shown when expanded)
-    private let songListHeight: CGFloat = 250
-
-    // Pill handle dimensions
-    private let pillWidth: CGFloat = 40
-    private let pillHeight: CGFloat = 4
-
-    // Sorted entries — most recently played first
     private var sortedEntries: [LibraryEntry] {
         library.entries.sorted { $0.lastPlayed > $1.lastPlayed }
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
+        HStack(spacing: 0) {
+            // Sidebar panel
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Text("Library")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.8))
 
-            drawerContainer
-        }
-    }
+                    Spacer()
 
-    // MARK: - Outer Container
+                    Button(action: { library.isDrawerExpanded = false }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
 
-    /// The full drawer panel: translucent background wrapping the pill, controls,
-    /// and (when expanded) the song list.
-    private var drawerContainer: some View {
-        VStack(spacing: 0) {
-            // Pill handle — toggles expanded/collapsed song list
-            pillHandle
-                .onTapGesture {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                        isExpanded.toggle()
+                Divider()
+                    .background(Color.white.opacity(0.1))
+
+                // Song list
+                if sortedEntries.isEmpty {
+                    VStack {
+                        Spacer()
+                        Text("No songs yet")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.3))
+                        Text("Open an audio file to begin")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.2))
+                        Spacer()
+                    }
+                } else {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(sortedEntries) { entry in
+                                LibraryRowView(entry: entry)
+                                    .onTapGesture {
+                                        audioPlayer.loadLibraryEntry(entry)
+                                    }
+                            }
+                        }
+                        .padding(.vertical, 4)
                     }
                 }
-
-            // Inline playback controls (always visible inside the drawer)
-            controlsBar
-
-            // Song list — only shown when expanded
-            if isExpanded && !sortedEntries.isEmpty {
-                songList
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-        }
-        .background(drawerBackground)
-    }
+            .frame(width: 260)
+            .frame(maxHeight: .infinity)
+            .background(Color.black.opacity(0.25))
 
-    // MARK: - Background
-
-    private var drawerBackground: some View {
-        ZStack {
-            // Thin material blur layer
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .opacity(0.6)
-
-            // Dark tint on top so text stays readable
-            Color.black.opacity(0.5)
-        }
-        .overlay(
-            // Top separator line
-            VStack {
-                Divider()
-                    .background(Color.white.opacity(0.12))
-                Spacer()
-            }
-        )
-    }
-
-    // MARK: - Pill Handle
-
-    private var pillHandle: some View {
-        HStack {
-            Spacer()
-            RoundedRectangle(cornerRadius: pillHeight / 2)
-                .fill(Color.white.opacity(0.25))
-                .frame(width: pillWidth, height: pillHeight)
             Spacer()
         }
-        .contentShape(Rectangle())
-        .frame(height: 20)
-        .padding(.top, 8)
-    }
-
-    // MARK: - Controls Bar
-
-    /// Prev / Play-Pause / Next / Loop — always visible at the bottom of the screen.
-    private var controlsBar: some View {
-        HStack(spacing: 28) {
-            // Previous song
-            Button(action: { audioPlayer.playPreviousSong() }) {
-                Image(systemName: "backward.fill")
-                    .font(.system(size: 16))
-                    .foregroundColor(.white.opacity(0.7))
-            }
-            .buttonStyle(.plain)
-            .disabled(!audioPlayer.hasAudio && library.entries.isEmpty)
-
-            // Play / Pause
-            Button(action: { audioPlayer.togglePlayPause() }) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.15))
-                        .frame(width: 40, height: 40)
-
-                    Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 15))
-                        .foregroundColor(.white)
-                        .offset(x: audioPlayer.isPlaying ? 0 : 1.5)
-                }
-            }
-            .buttonStyle(.plain)
-
-            // Next song
-            Button(action: { audioPlayer.playNextSong() }) {
-                Image(systemName: "forward.fill")
-                    .font(.system(size: 16))
-                    .foregroundColor(.white.opacity(0.7))
-            }
-            .buttonStyle(.plain)
-            .disabled(!audioPlayer.hasAudio && library.entries.isEmpty)
-
-            // Separator
-            Rectangle()
-                .fill(Color.white.opacity(0.15))
-                .frame(width: 1, height: 18)
-
-            // Loop toggle
-            Button(action: { audioPlayer.toggleLoop() }) {
-                Image(systemName: audioPlayer.isLooping ? "repeat.1" : "repeat")
-                    .font(.system(size: 14))
-                    .foregroundColor(audioPlayer.isLooping ? .white : .white.opacity(0.4))
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 28)
-        .padding(.vertical, 12)
-    }
-
-    // MARK: - Song List
-
-    private var songList: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            LazyVStack(spacing: 0) {
-                ForEach(sortedEntries) { entry in
-                    LibraryRowView(entry: entry)
-                        .onTapGesture {
-                            audioPlayer.loadLibraryEntry(entry)
-                        }
-                }
-            }
-            .padding(.vertical, 4)
-        }
-        .frame(height: songListHeight)
     }
 }
 
 // MARK: - Library Row View
 
-/// A single row inside the library drawer representing one ``LibraryEntry``.
 private struct LibraryRowView: View {
 
     let entry: LibraryEntry
@@ -225,7 +128,7 @@ private struct LibraryRowView: View {
                     .foregroundColor(.white.opacity(0.4))
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 4)
 
             // Last played date
             Text(relativeLabel(for: entry.lastPlayed))
@@ -239,13 +142,13 @@ private struct LibraryRowView: View {
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(isHovered ? 0.6 : 0.2))
+                    .foregroundColor(.white.opacity(isHovered ? 0.6 : 0.15))
             }
             .buttonStyle(.plain)
-            .padding(.trailing, 12)
+            .padding(.trailing, 10)
             .help("Remove from library")
         }
-        .frame(height: 40)
+        .frame(height: 36)
         .background(rowBackground)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
