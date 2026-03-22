@@ -30,6 +30,10 @@ class AudioPlayerManager: ObservableObject {
     /// without creating a retain cycle. Set this immediately after creating the manager.
     weak var settingsRef: SettingsManager?
 
+    /// Weak reference to the app's LibraryManager for auto-import of opened audio and lyrics
+    /// files. Set this immediately after creating the manager.
+    weak var libraryRef: LibraryManager?
+
     /// Base directory of the currently loaded `.nyaviz` file, used to resolve relative paths
     /// in `background:` directives.
     private var nyavizBaseDirectory: URL?

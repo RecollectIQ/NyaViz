@@ -10,6 +10,7 @@ import CoreText
 struct NyaVizApp: App {
     @StateObject private var audioPlayer = AudioPlayerManager()
     @StateObject private var settingsManager = SettingsManager()
+    @StateObject private var libraryManager = LibraryManager()
 
     init() {
         // Register custom fonts
@@ -44,11 +45,14 @@ struct NyaVizApp: App {
             ContentView()
                 .environmentObject(audioPlayer)
                 .environmentObject(settingsManager)
+                .environmentObject(libraryManager)
                 .frame(minWidth: 900, minHeight: 600)
                 .task {
-                    // Wire the settings reference so AudioPlayerManager can apply directives.
-                    // This runs on the MainActor immediately after the first render.
+                    // Wire the settings and library references so AudioPlayerManager can apply
+                    // directives and auto-import opened files. Runs on the MainActor immediately
+                    // after the first render.
                     audioPlayer.settingsRef = settingsManager
+                    audioPlayer.libraryRef = libraryManager
                 }
         }
         .windowStyle(.hiddenTitleBar)
