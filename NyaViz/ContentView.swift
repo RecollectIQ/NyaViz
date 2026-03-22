@@ -69,6 +69,9 @@ struct ContentView: View {
                 SettingsPanelView()
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
+
+            // Library drawer — visible in both normal and fullscreen modes
+            LibraryDrawerView()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onHover { hovering in
@@ -103,4 +106,5 @@ struct ContentView: View {
     ContentView()
         .environmentObject(AudioPlayerManager())
         .environmentObject(SettingsManager())
+        .environmentObject(LibraryManager())
 }
