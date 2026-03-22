@@ -236,6 +236,21 @@ class AudioPlayerManager: ObservableObject {
         }
     }
     
+    /// Load a library entry (audio + lyrics)
+    func loadLibraryEntry(_ entry: LibraryEntry) {
+        guard let library = libraryRef else { return }
+        isLoadingFromLibrary = true
+        defer { isLoadingFromLibrary = false }
+
+        if let audioURL = library.audioURL(for: entry) {
+            loadAudio(from: audioURL)
+        }
+        if let lyricsURL = library.lyricsURL(for: entry) {
+            loadSRT(from: lyricsURL)
+        }
+        library.currentEntryId = entry.id
+    }
+
     func play() {
         guard let player = playerNode, audioFile != nil, let engine = audioEngine else { return }
         
