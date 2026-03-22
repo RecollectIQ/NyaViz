@@ -221,6 +221,19 @@ class AudioPlayerManager: ObservableObject {
 
         let formatName = url.pathExtension.lowercased() == "nyaviz" ? "NyaViz" : "SRT"
         print("Loaded \(lyrics.count) lyrics and \(directives.count) directives from \(formatName)")
+
+        // Save lyrics to library
+        if let library = libraryRef, !isLoadingFromLibrary {
+            let imagePaths = directives.compactMap { d -> String? in
+                if case .background(let path) = d.type { return path }
+                return nil
+            }
+            library.importLyrics(
+                from: url,
+                directiveImagePaths: imagePaths,
+                imageSourceDir: nyavizBaseDirectory
+            )
+        }
     }
     
     func play() {
