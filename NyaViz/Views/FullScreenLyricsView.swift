@@ -372,22 +372,22 @@ struct FloatingControlsView: View {
                 .buttonStyle(.plain)
                 .disabled(videoExporter.isExporting)
                 
-                // Seek back
-                Button(action: { audioPlayer.seekBackward(10) }) {
-                    Image(systemName: "gobackward.10")
+                // Previous song
+                Button(action: { audioPlayer.playPreviousSong() }) {
+                    Image(systemName: "backward.fill")
                         .font(.system(size: 18))
                         .foregroundColor(.white.opacity(0.5))
                 }
                 .buttonStyle(.plain)
                 .disabled(videoExporter.isExporting)
-                
+
                 // Play/Pause
                 Button(action: { audioPlayer.togglePlayPause() }) {
                     ZStack {
                         Circle()
                             .fill(.white)
                             .frame(width: 44, height: 44)
-                        
+
                         Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
                             .font(.system(size: 16))
                             .foregroundColor(.black)
@@ -396,10 +396,10 @@ struct FloatingControlsView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(videoExporter.isExporting)
-                
-                // Seek forward
-                Button(action: { audioPlayer.seekForward(10) }) {
-                    Image(systemName: "goforward.10")
+
+                // Next song
+                Button(action: { audioPlayer.playNextSong() }) {
+                    Image(systemName: "forward.fill")
                         .font(.system(size: 18))
                         .foregroundColor(.white.opacity(0.5))
                 }

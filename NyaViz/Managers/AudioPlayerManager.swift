@@ -236,7 +236,7 @@ class AudioPlayerManager: ObservableObject {
         }
     }
     
-    /// Load a library entry (audio + lyrics)
+    /// Load a library entry (audio + lyrics) and immediately start playback.
     func loadLibraryEntry(_ entry: LibraryEntry) {
         guard let library = libraryRef else { return }
         isLoadingFromLibrary = true
@@ -249,6 +249,35 @@ class AudioPlayerManager: ObservableObject {
             loadSRT(from: lyricsURL)
         }
         library.currentEntryId = entry.id
+
+        // Auto-play when switching songs (either from the drawer or playlist advance)
+        play()
+    }
+
+    // MARK: - Playlist Navigation
+
+    /// Play the next song in the library playlist (sorted by lastPlayed descending).
+    /// Wraps around to the first song when at the end of the list.
+    func playNextSong() {
+        guard let library = libraryRef else { return }
+        let sorted = library.entries.sorted { $0.lastPlayed > $1.lastPlayed }
+        guard !sorted.isEmpty else { return }
+
+        let currentIdx = sorted.firstIndex(where: { $0.id == library.currentEntryId }) ?? -1
+        let nextIdx = (currentIdx + 1) % sorted.count
+        loadLibraryEntry(sorted[nextIdx])
+    }
+
+    /// Play the previous song in the library playlist (sorted by lastPlayed descending).
+    /// Wraps around to the last song when at the beginning of the list.
+    func playPreviousSong() {
+        guard let library = libraryRef else { return }
+        let sorted = library.entries.sorted { $0.lastPlayed > $1.lastPlayed }
+        guard !sorted.isEmpty else { return }
+
+        let currentIdx = sorted.firstIndex(where: { $0.id == library.currentEntryId }) ?? 0
+        let prevIdx = (currentIdx - 1 + sorted.count) % sorted.count
+        loadLibraryEntry(sorted[prevIdx])
     }
 
     func play() {
@@ -338,6 +367,19 @@ class AudioPlayerManager: ObservableObject {
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     guard currentGeneration == self.scheduleGeneration else { return }
+
+                    // Try to advance to the next song in the library playlist
+                    if let library = self.libraryRef {
+                        let sorted = library.entries.sorted { $0.lastPlayed > $1.lastPlayed }
+                        if !sorted.isEmpty {
+                            let currentIdx = sorted.firstIndex(where: { $0.id == library.currentEntryId }) ?? -1
+                            let nextIdx = (currentIdx + 1) % sorted.count
+                            self.loadLibraryEntry(sorted[nextIdx])
+                            return
+                        }
+                    }
+
+                    // No library or no entries — stop playback
                     self.isPlaying = false
                     self.stopTimer()
                 }
