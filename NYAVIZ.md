@@ -238,11 +238,35 @@ Verse one lyric
 Chorus lyric
 ```
 
-A directive block must contain only the single directive line. If a block has multiple lines, it is treated as a subtitle block and the directive is ignored.
+Multiple directives can appear in the same block (consecutive lines all starting with `!`):
+
+```
+!00:01:30,000 background:chorus.jpg
+!00:01:30,000 mode:dialog
+```
+
+### Transitions
+
+When a `background` directive fires, the old and new images crossfade over 0.8 seconds. When a `mode` directive fires, the lyric display crossfades over 0.8 seconds. Both transitions use `easeInOut` timing and run simultaneously when triggered at the same timestamp.
+
+### Settings Override & Restore
+
+Directives override the user's current settings (lyric mode, background image) during playback. The user's original settings are automatically restored when:
+
+- A new lyrics file is loaded
+- Playback is stopped
+
+This means a `.nyaviz` file has full control over the visual experience during its playback without permanently changing the user's preferences.
 
 ### Seek Behaviour
 
 When the user seeks to a new position, directives are re-evaluated from the beginning up to the seeked position, so the display state always reflects what it should be at that point in the track.
+
+### Image Loading
+
+Background images referenced by directives are resolved relative to the `.nyaviz` file's directory. On macOS, the app prompts for folder access (sandbox) when background directives are detected, then pre-loads all referenced images into memory for instant switching during playback.
+
+When a `.nyaviz` file is added to the library, all referenced background images are copied into the library entry folder alongside the audio and lyrics files, making the entry fully self-contained.
 
 ### Backwards Compatibility
 
@@ -354,8 +378,48 @@ let styledLine = NyaVizParser.parseStyledLine("Hello [#FF0000]World[/]")
 3. **Emphasis**: Bold important words, italicize whispered/soft passages
 4. **Character differentiation**: Different colors for different singers/characters
 5. **Artistic styling**: Match colors to song themes or album artwork
+6. **Music video feel**: Use `background` and `mode` directives to create scene changes synced to the music
+7. **Playlist experience**: Songs with `.nyaviz` files retain their full visual experience in the library
+
+## Song Library
+
+NyaViz maintains a persistent song library at `~/Library/Application Support/NyaViz/Library/`. Songs are auto-added when opened and can be browsed via the library sidebar.
+
+### Library Structure
+
+```
+Library/
+├── <uuid>/
+│   ├── index.json          # Entry metadata
+│   ├── audio.mp3           # Copied audio file
+│   ├── lyrics.nyaviz       # Copied lyrics (optional, replaceable)
+│   ├── backdrop1.jpg       # Copied directive images
+│   └── backdrop2.jpg
+```
+
+### Key Behaviours
+
+- **Auto-add**: Opening an audio file automatically adds it to the library
+- **Duplicate detection**: If the same audio filename exists, the existing entry is loaded
+- **Lyrics replacement**: Opening new lyrics for the same audio replaces the old lyrics and associated directive images
+- **Self-contained**: All files (audio, lyrics, directive images) are copied into the library folder
+- **Playlist playback**: When loop-one is off, the next song in the library plays automatically
+
+## Video Export
+
+NyaViz can export the lyrics visualization as an MP4 video. The export renders:
+
+- Background image with blur/opacity settings
+- Styled text (colors, bold, italic) in all lyric modes
+- Dialog mode with game-style conversation box
+- Minimal mode with centered uppercase text
+- Audio visualizer bars
+- Snow particle effects
+- Track info with progress ring
+
+All UI elements scale proportionally with the chosen resolution (480p, 720p, 1080p, 4K), using 1080p as the reference.
 
 ---
 
-*NyaViz Format Specification v1.1*
+*NyaViz Format Specification v1.2*
 

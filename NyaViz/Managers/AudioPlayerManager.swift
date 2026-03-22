@@ -144,33 +144,51 @@ class AudioPlayerManager: ObservableObject {
     
     private func setupAudioEngine() {
         guard let file = audioFile else { return }
-        
+
         audioEngine = AVAudioEngine()
         playerNode = AVAudioPlayerNode()
-        
+
         guard let engine = audioEngine, let player = playerNode else { return }
-        
-        let format = file.processingFormat
-        
-        // Attach and connect nodes
+
+        let fileFormat = file.processingFormat
+
+        // Attach player node
         engine.attach(player)
-        engine.connect(player, to: engine.mainMixerNode, format: format)
-        
+
+        // Connect player to mixer — use the mixer's input format when possible to avoid
+        // crashes with virtual audio devices (e.g. BlackHole) that may have incompatible
+        // channel counts or sample rates.
+        let outputFormat = engine.mainMixerNode.outputFormat(forBus: 0)
+        if outputFormat.sampleRate > 0 && outputFormat.channelCount > 0 {
+            // Use file format for the connection — AVAudioEngine handles conversion
+            engine.connect(player, to: engine.mainMixerNode, format: fileFormat)
+        } else {
+            // Fallback: connect without explicit format
+            engine.connect(player, to: engine.mainMixerNode, format: nil)
+        }
+
         // Set initial volume
         engine.mainMixerNode.outputVolume = volume
-        
+
         // Install tap for FFT analysis
         // Use nil format to match the mixer's native output format (hardware sample rate)
-        // Using the file's format here causes sample rate mismatch, degrading audio quality
         let bufferSize: AVAudioFrameCount = AVAudioFrameCount(fftSize)
         engine.mainMixerNode.installTap(onBus: 0, bufferSize: bufferSize, format: nil) { [weak self] buffer, _ in
             self?.processAudioBuffer(buffer)
         }
-        
+
         do {
             try engine.start()
         } catch {
             print("Error starting audio engine: \(error)")
+            // Try once more without the tap — some virtual devices reject taps
+            engine.mainMixerNode.removeTap(onBus: 0)
+            do {
+                try engine.start()
+                print("Audio engine started without FFT tap")
+            } catch {
+                print("Audio engine failed to start: \(error)")
+            }
         }
     }
     
