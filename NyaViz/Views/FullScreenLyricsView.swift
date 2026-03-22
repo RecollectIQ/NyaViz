@@ -8,6 +8,7 @@ import SwiftUI
 struct FullScreenLyricsView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
+    @EnvironmentObject var library: LibraryManager
     
     var body: some View {
         GeometryReader { geo in
@@ -50,13 +51,13 @@ struct FullScreenLyricsView: View {
                                 Circle()
                                     .stroke(Color.white.opacity(0.15), lineWidth: strokeWidth)
                                     .frame(width: ringSize, height: ringSize)
-                                
+
                                 Circle()
                                     .trim(from: 0, to: audioPlayer.progress)
                                     .stroke(Color.white.opacity(0.8), style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round))
                                     .frame(width: ringSize, height: ringSize)
                                     .rotationEffect(.degrees(-90))
-                                
+
                                 Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
                                     .font(.system(size: iconSize))
                                     .foregroundColor(.white.opacity(0.8))

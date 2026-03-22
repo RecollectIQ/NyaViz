@@ -41,8 +41,8 @@ struct ContentView: View {
                 .padding(.bottom, 40)
             }
 
-            // Library Button (top left) - subtle, shows on hover, mirrors settings button
-            if !library.isDrawerExpanded {
+            // Library Button (top left) - not in fullscreen
+            if !library.isDrawerExpanded && !settings.isFullScreen {
                 VStack {
                     HStack {
                         Button(action: {
@@ -70,8 +70,8 @@ struct ContentView: View {
                 }
             }
 
-            // Settings Button (top right) - hidden when panel is open, shows on hover
-            if !settings.showSettings {
+            // Settings Button (top right) - not in fullscreen
+            if !settings.showSettings && !settings.isFullScreen {
                 VStack {
                     HStack {
                         Spacer()
@@ -95,14 +95,14 @@ struct ContentView: View {
                 }
             }
 
-            // Library Sidebar (left)
-            if library.isDrawerExpanded {
+            // Library Sidebar (left) - not in fullscreen
+            if library.isDrawerExpanded && !settings.isFullScreen {
                 LibraryDrawerView()
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
 
-            // Settings Panel (right)
-            if settings.showSettings {
+            // Settings Panel (right) - not in fullscreen
+            if settings.showSettings && !settings.isFullScreen {
                 SettingsPanelView()
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
