@@ -34,6 +34,9 @@ class AudioPlayerManager: ObservableObject {
     /// files. Set this immediately after creating the manager.
     weak var libraryRef: LibraryManager?
 
+    /// When true, skip auto-importing to library (loading FROM the library)
+    var isLoadingFromLibrary = false
+
     /// Base directory of the currently loaded `.nyaviz` file, used to resolve relative paths
     /// in `background:` directives.
     private var nyavizBaseDirectory: URL?
@@ -123,7 +126,17 @@ class AudioPlayerManager: ObservableObject {
             currentTime = 0
             
             setupAudioEngine()
-            
+
+            // Auto-add to library
+            if let library = libraryRef, !isLoadingFromLibrary {
+                if let (entry, _) = library.importAudio(from: url) {
+                    // If entry already has lyrics, load them automatically
+                    if let lyricsURL = library.lyricsURL(for: entry) {
+                        loadSRT(from: lyricsURL)
+                    }
+                }
+            }
+
         } catch {
             print("Error loading audio: \(error.localizedDescription)")
         }
