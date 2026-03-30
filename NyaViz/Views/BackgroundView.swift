@@ -15,94 +15,91 @@ struct BackgroundView: View {
     @State private var crossfadeOpacity: Double = 1.0
 
     var body: some View {
-        ZStack {
-            // Base dark background
-            SettingsManager.background
+        TimelineView(.animation(minimumInterval: 1 / 60)) { timeline in
+            let liveDriftPhase = AmbientVisualizerTuning.backgroundDriftPhase(
+                time: timeline.date.timeIntervalSinceReferenceDate
+            )
 
-            // Previous image (fading out during crossfade)
-            if let prevImage = previousImage {
-                GeometryReader { geo in
-                    let drift = AmbientVisualizerTuning.backgroundDrift(
-                        size: geo.size,
-                        time: audioPlayer.currentTime
+            ZStack {
+                // Base dark background
+                SettingsManager.background
+
+                // Previous image (fading out during crossfade)
+                if let prevImage = previousImage {
+                    BackgroundImageLayer(
+                        image: prevImage,
+                        opacity: settings.backgroundOpacity * (1.0 - crossfadeOpacity),
+                        blur: settings.backgroundBlur,
+                        driftPhase: liveDriftPhase
                     )
-                    Image(nsImage: prevImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(
-                            width: geo.size.width * AmbientVisualizerTuning.backgroundFrameExpansion,
-                            height: geo.size.height * AmbientVisualizerTuning.backgroundFrameExpansion
-                        )
-                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
-                        .offset(drift)
-                        .clipped()
-                        .blur(radius: settings.backgroundBlur)
-                        .opacity(settings.backgroundOpacity * (1.0 - crossfadeOpacity))
-                        .scaleEffect(
-                            settings.showVisualizer
-                            ? AmbientVisualizerTuning.backgroundScale(
-                                bassEnergy: audioPlayer.bassEnergy,
-                                intensity: settings.visualizerIntensity
-                            )
-                            : 1.0
-                        )
+                }
+
+                // Current background image (fading in)
+                if let image = displayedImage {
+                    BackgroundImageLayer(
+                        image: image,
+                        opacity: settings.backgroundOpacity * crossfadeOpacity,
+                        blur: settings.backgroundBlur,
+                        driftPhase: liveDriftPhase
+                    )
+                }
+
+                // Dark overlay for better text contrast
+                Color.black.opacity(0.3)
+
+                // Floating dust motes
+                if settings.showParticles {
+                    DustMoteView(
+                        density: settings.particleDensity,
+                        bassEnergy: audioPlayer.bassEnergy,
+                        intensity: settings.showVisualizer ? settings.visualizerIntensity : 0
+                    )
                 }
             }
-
-            // Current background image (fading in)
-            if let image = displayedImage {
-                GeometryReader { geo in
-                    let drift = AmbientVisualizerTuning.backgroundDrift(
-                        size: geo.size,
-                        time: audioPlayer.currentTime
-                    )
-                    Image(nsImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(
-                            width: geo.size.width * AmbientVisualizerTuning.backgroundFrameExpansion,
-                            height: geo.size.height * AmbientVisualizerTuning.backgroundFrameExpansion
-                        )
-                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
-                        .offset(drift)
-                        .clipped()
-                        .blur(radius: settings.backgroundBlur)
-                        .opacity(settings.backgroundOpacity * crossfadeOpacity)
-                        .scaleEffect(
-                            settings.showVisualizer
-                            ? AmbientVisualizerTuning.backgroundScale(
-                                bassEnergy: audioPlayer.bassEnergy,
-                                intensity: settings.visualizerIntensity
-                            )
-                            : 1.0
-                        )
+            .ignoresSafeArea()
+            .onChange(of: settings.backgroundImage) { _, newValue in
+                guard newValue !== displayedImage else { return }
+                previousImage = displayedImage
+                displayedImage = newValue
+                crossfadeOpacity = 0
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    crossfadeOpacity = 1.0
                 }
             }
-
-            // Dark overlay for better text contrast
-            Color.black.opacity(0.3)
-
-            // Floating dust motes
-            if settings.showParticles {
-                DustMoteView(
-                    density: settings.particleDensity,
-                    bassEnergy: audioPlayer.bassEnergy,
-                    intensity: settings.showVisualizer ? settings.visualizerIntensity : 0
-                )
+            .onAppear {
+                displayedImage = settings.backgroundImage
             }
         }
-        .ignoresSafeArea()
-        .onChange(of: settings.backgroundImage) { _, newValue in
-            guard newValue !== displayedImage else { return }
-            previousImage = displayedImage
-            displayedImage = newValue
-            crossfadeOpacity = 0
-            withAnimation(.easeInOut(duration: 0.8)) {
-                crossfadeOpacity = 1.0
+    }
+}
+
+private struct BackgroundImageLayer: View {
+    let image: NSImage
+    let opacity: Double
+    let blur: Double
+    let driftPhase: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            let drift = AmbientVisualizerTuning.backgroundDrift(
+                size: geo.size,
+                phase: driftPhase
+            )
+
+            ZStack {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(
+                        width: geo.size.width * AmbientVisualizerTuning.backgroundFrameExpansion,
+                        height: geo.size.height * AmbientVisualizerTuning.backgroundFrameExpansion
+                    )
+                    .offset(drift)
+                    .blur(radius: blur)
             }
-        }
-        .onAppear {
-            displayedImage = settings.backgroundImage
+            .frame(width: geo.size.width, height: geo.size.height)
+            .clipped()
+            .opacity(opacity)
         }
     }
 }
@@ -132,7 +129,7 @@ struct DustMoteView: View {
     }
 
     private func drawParticles(context: GraphicsContext, size: CGSize, date: Date) {
-        let particleCount = Int(40 * density)
+        let particleCount = AmbientVisualizerTuning.particleCount(density: density)
         let time = date.timeIntervalSinceReferenceDate
 
         for i in 0..<particleCount {
@@ -165,6 +162,12 @@ struct DustMoteView: View {
             let driftAngle = driftXRandom * .pi * 2
             let dx = cos(driftAngle) * speed
             let dy = sin(driftAngle) * speed
+            let beatOffset = AmbientVisualizerTuning.particleBeatOffset(
+                bassEnergy: bassEnergy,
+                intensity: intensity,
+                direction: driftAngle + driftYRandom * 1.2,
+                variance: sizeRandom
+            )
 
             // Position with gentle wandering
             let baseX = xRandom * size.width
@@ -177,10 +180,12 @@ struct DustMoteView: View {
                 .truncatingRemainder(dividingBy: size.width + 20) - 10
             let y = (baseY + dy * time.truncatingRemainder(dividingBy: 200) + wanderY)
                 .truncatingRemainder(dividingBy: size.height + 20) - 10
+            let pulsedX = x + beatOffset.width
+            let pulsedY = y + beatOffset.height
 
             let rect = CGRect(
-                x: x - particleSize / 2,
-                y: y - particleSize / 2,
+                x: pulsedX - particleSize / 2,
+                y: pulsedY - particleSize / 2,
                 width: particleSize,
                 height: particleSize
             )

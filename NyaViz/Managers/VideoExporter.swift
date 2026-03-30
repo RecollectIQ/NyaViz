@@ -914,29 +914,27 @@ struct ExportableFullScreenViewStatic: View {
                 SettingsManager.background
 
                 if let image = backgroundImage {
-                    let drift = AmbientVisualizerTuning.backgroundDrift(
-                        size: size,
+                    let driftPhase = AmbientVisualizerTuning.backgroundDriftPhase(
                         time: simulatedPlayer.currentTime
                     )
-                    Image(nsImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(
-                            width: size.width * AmbientVisualizerTuning.backgroundFrameExpansion,
-                            height: size.height * AmbientVisualizerTuning.backgroundFrameExpansion
-                        )
-                        .offset(drift)
-                        .clipped()
-                        .blur(radius: capturedSettings.backgroundBlur * scale)
-                        .opacity(capturedSettings.backgroundOpacity)
-                        .scaleEffect(
-                            capturedSettings.showVisualizer
-                            ? AmbientVisualizerTuning.backgroundScale(
-                                bassEnergy: simulatedPlayer.bassEnergy,
-                                intensity: capturedSettings.visualizerIntensity
+                    let drift = AmbientVisualizerTuning.backgroundDrift(
+                        size: size,
+                        phase: driftPhase
+                    )
+                    ZStack {
+                        Image(nsImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(
+                                width: size.width * AmbientVisualizerTuning.backgroundFrameExpansion,
+                                height: size.height * AmbientVisualizerTuning.backgroundFrameExpansion
                             )
-                            : 1.0
-                        )
+                            .offset(drift)
+                            .blur(radius: capturedSettings.backgroundBlur * scale)
+                    }
+                    .frame(width: size.width, height: size.height)
+                    .clipped()
+                    .opacity(capturedSettings.backgroundOpacity)
                 }
 
                 Color.black.opacity(0.3)
@@ -1060,7 +1058,7 @@ struct ExportableDustMoteViewStatic: View {
     }
 
     private func drawParticles(context: GraphicsContext, size: CGSize) {
-        let particleCount = Int(40 * density)
+        let particleCount = AmbientVisualizerTuning.particleCount(density: density)
 
         for i in 0..<particleCount {
             let xRandom = hash(i * 7919)
@@ -1088,6 +1086,12 @@ struct ExportableDustMoteViewStatic: View {
             let driftAngle = driftXRandom * .pi * 2
             let dx = cos(driftAngle) * speed
             let dy = sin(driftAngle) * speed
+            let beatOffset = AmbientVisualizerTuning.particleBeatOffset(
+                bassEnergy: bassEnergy,
+                intensity: intensity,
+                direction: driftAngle + driftYRandom * 1.2,
+                variance: sizeRandom
+            )
 
             let baseX = xRandom * size.width
             let baseY = yRandom * size.height
@@ -1098,10 +1102,12 @@ struct ExportableDustMoteViewStatic: View {
                 .truncatingRemainder(dividingBy: size.width + 20) - 10
             let y = (baseY + dy * time.truncatingRemainder(dividingBy: 200) + wanderY)
                 .truncatingRemainder(dividingBy: size.height + 20) - 10
+            let pulsedX = x + beatOffset.width
+            let pulsedY = y + beatOffset.height
 
             let rect = CGRect(
-                x: x - particleSize / 2,
-                y: y - particleSize / 2,
+                x: pulsedX - particleSize / 2,
+                y: pulsedY - particleSize / 2,
                 width: particleSize,
                 height: particleSize
             )
@@ -1444,26 +1450,22 @@ struct ExportableBackgroundView: View {
             SettingsManager.background
 
             if let image = settings.backgroundImage {
-                let drift = AmbientVisualizerTuning.backgroundDrift(size: size, time: time)
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(
-                        width: size.width * AmbientVisualizerTuning.backgroundFrameExpansion,
-                        height: size.height * AmbientVisualizerTuning.backgroundFrameExpansion
-                    )
-                    .offset(drift)
-                    .clipped()
-                    .blur(radius: settings.backgroundBlur)
-                    .opacity(settings.backgroundOpacity)
-                    .scaleEffect(
-                        settings.showVisualizer
-                        ? AmbientVisualizerTuning.backgroundScale(
-                            bassEnergy: simulatedPlayer.bassEnergy,
-                            intensity: settings.visualizerIntensity
+                let driftPhase = AmbientVisualizerTuning.backgroundDriftPhase(time: time)
+                let drift = AmbientVisualizerTuning.backgroundDrift(size: size, phase: driftPhase)
+                ZStack {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(
+                            width: size.width * AmbientVisualizerTuning.backgroundFrameExpansion,
+                            height: size.height * AmbientVisualizerTuning.backgroundFrameExpansion
                         )
-                        : 1.0
-                    )
+                        .offset(drift)
+                        .blur(radius: settings.backgroundBlur)
+                }
+                .frame(width: size.width, height: size.height)
+                .clipped()
+                .opacity(settings.backgroundOpacity)
             }
 
             Color.black.opacity(0.3)
@@ -1503,7 +1505,7 @@ struct ExportableDustMoteView: View {
     }
 
     private func drawParticles(context: GraphicsContext, size: CGSize) {
-        let particleCount = Int(40 * density)
+        let particleCount = AmbientVisualizerTuning.particleCount(density: density)
 
         for i in 0..<particleCount {
             let xRandom = hash(i * 7919)
@@ -1531,6 +1533,12 @@ struct ExportableDustMoteView: View {
             let driftAngle = driftXRandom * .pi * 2
             let dx = cos(driftAngle) * speed
             let dy = sin(driftAngle) * speed
+            let beatOffset = AmbientVisualizerTuning.particleBeatOffset(
+                bassEnergy: bassEnergy,
+                intensity: intensity,
+                direction: driftAngle + driftYRandom * 1.2,
+                variance: sizeRandom
+            )
 
             let baseX = xRandom * size.width
             let baseY = yRandom * size.height
@@ -1541,10 +1549,12 @@ struct ExportableDustMoteView: View {
                 .truncatingRemainder(dividingBy: size.width + 20) - 10
             let y = (baseY + dy * time.truncatingRemainder(dividingBy: 200) + wanderY)
                 .truncatingRemainder(dividingBy: size.height + 20) - 10
+            let pulsedX = x + beatOffset.width
+            let pulsedY = y + beatOffset.height
 
             let rect = CGRect(
-                x: x - particleSize / 2,
-                y: y - particleSize / 2,
+                x: pulsedX - particleSize / 2,
+                y: pulsedY - particleSize / 2,
                 width: particleSize,
                 height: particleSize
             )
