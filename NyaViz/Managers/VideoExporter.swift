@@ -921,13 +921,23 @@ struct ExportableFullScreenViewStatic: View {
                         .clipped()
                         .blur(radius: capturedSettings.backgroundBlur * scale)
                         .opacity(capturedSettings.backgroundOpacity)
-                        .scaleEffect(capturedSettings.showVisualizer ? 1.0 + Double(simulatedPlayer.bassEnergy) * 0.02 * capturedSettings.visualizerIntensity : 1.0)
+                        .scaleEffect(
+                            capturedSettings.showVisualizer
+                            ? AmbientVisualizerTuning.backgroundScale(
+                                bassEnergy: simulatedPlayer.bassEnergy,
+                                intensity: capturedSettings.visualizerIntensity
+                            )
+                            : 1.0
+                        )
                 }
 
                 Color.black.opacity(0.3)
 
                 if capturedSettings.showVisualizer {
-                    let vignetteStrength = 0.6 + Double(simulatedPlayer.bassEnergy) * 0.1 * capturedSettings.visualizerIntensity
+                    let vignetteStrength = AmbientVisualizerTuning.vignetteStrength(
+                        bassEnergy: simulatedPlayer.bassEnergy,
+                        intensity: capturedSettings.visualizerIntensity
+                    )
                     let maxDimension = max(size.width, size.height)
                     RadialGradient(
                         gradient: Gradient(colors: [
@@ -1060,7 +1070,6 @@ struct ExportableDustMoteViewStatic: View {
 
     private func drawParticles(context: GraphicsContext, size: CGSize) {
         let particleCount = Int(40 * density)
-        let bass = Double(bassEnergy) * intensity
 
         for i in 0..<particleCount {
             let xRandom = hash(i * 7919)
@@ -1073,8 +1082,16 @@ struct ExportableDustMoteViewStatic: View {
 
             let baseSize = 1.0 + sizeRandom * 2.0
             let baseOpacity = 0.15 + opacityRandom * 0.2
-            let particleSize = baseSize + bass * 0.5
-            let opacity = baseOpacity + bass * 0.1
+            let particleSize = AmbientVisualizerTuning.particleSize(
+                baseSize: baseSize,
+                bassEnergy: bassEnergy,
+                intensity: intensity
+            )
+            let opacity = AmbientVisualizerTuning.particleOpacity(
+                baseOpacity: baseOpacity,
+                bassEnergy: bassEnergy,
+                intensity: intensity
+            )
 
             let speed = 5 + speedRandom * 10
             let driftAngle = driftXRandom * .pi * 2
@@ -1443,13 +1460,23 @@ struct ExportableBackgroundView: View {
                     .clipped()
                     .blur(radius: settings.backgroundBlur)
                     .opacity(settings.backgroundOpacity)
-                    .scaleEffect(settings.showVisualizer ? 1.0 + Double(simulatedPlayer.bassEnergy) * 0.02 * settings.visualizerIntensity : 1.0)
+                    .scaleEffect(
+                        settings.showVisualizer
+                        ? AmbientVisualizerTuning.backgroundScale(
+                            bassEnergy: simulatedPlayer.bassEnergy,
+                            intensity: settings.visualizerIntensity
+                        )
+                        : 1.0
+                    )
             }
 
             Color.black.opacity(0.3)
 
             if settings.showVisualizer {
-                let vignetteStrength = 0.6 + Double(simulatedPlayer.bassEnergy) * 0.1 * settings.visualizerIntensity
+                let vignetteStrength = AmbientVisualizerTuning.vignetteStrength(
+                    bassEnergy: simulatedPlayer.bassEnergy,
+                    intensity: settings.visualizerIntensity
+                )
                 let maxDimension = max(size.width, size.height)
                 RadialGradient(
                     gradient: Gradient(colors: [
@@ -1498,7 +1525,6 @@ struct ExportableDustMoteView: View {
 
     private func drawParticles(context: GraphicsContext, size: CGSize) {
         let particleCount = Int(40 * density)
-        let bass = Double(bassEnergy) * intensity
 
         for i in 0..<particleCount {
             let xRandom = hash(i * 7919)
@@ -1511,8 +1537,16 @@ struct ExportableDustMoteView: View {
 
             let baseSize = 1.0 + sizeRandom * 2.0
             let baseOpacity = 0.15 + opacityRandom * 0.2
-            let particleSize = baseSize + bass * 0.5
-            let opacity = baseOpacity + bass * 0.1
+            let particleSize = AmbientVisualizerTuning.particleSize(
+                baseSize: baseSize,
+                bassEnergy: bassEnergy,
+                intensity: intensity
+            )
+            let opacity = AmbientVisualizerTuning.particleOpacity(
+                baseOpacity: baseOpacity,
+                bassEnergy: bassEnergy,
+                intensity: intensity
+            )
 
             let speed = 5 + speedRandom * 10
             let driftAngle = driftXRandom * .pi * 2
@@ -1678,4 +1712,3 @@ struct ExportableLyricLine: View {
         .frame(maxWidth: .infinity)
     }
 }
-

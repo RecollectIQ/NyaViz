@@ -30,7 +30,14 @@ struct BackgroundView: View {
                         .clipped()
                         .blur(radius: settings.backgroundBlur)
                         .opacity(settings.backgroundOpacity * (1.0 - crossfadeOpacity))
-                        .scaleEffect(settings.showVisualizer ? 1.0 + Double(audioPlayer.bassEnergy) * 0.02 * settings.visualizerIntensity : 1.0)
+                        .scaleEffect(
+                            settings.showVisualizer
+                            ? AmbientVisualizerTuning.backgroundScale(
+                                bassEnergy: audioPlayer.bassEnergy,
+                                intensity: settings.visualizerIntensity
+                            )
+                            : 1.0
+                        )
                 }
             }
 
@@ -45,7 +52,14 @@ struct BackgroundView: View {
                         .clipped()
                         .blur(radius: settings.backgroundBlur)
                         .opacity(settings.backgroundOpacity * crossfadeOpacity)
-                        .scaleEffect(settings.showVisualizer ? 1.0 + Double(audioPlayer.bassEnergy) * 0.02 * settings.visualizerIntensity : 1.0)
+                        .scaleEffect(
+                            settings.showVisualizer
+                            ? AmbientVisualizerTuning.backgroundScale(
+                                bassEnergy: audioPlayer.bassEnergy,
+                                intensity: settings.visualizerIntensity
+                            )
+                            : 1.0
+                        )
                 }
             }
 
@@ -55,7 +69,10 @@ struct BackgroundView: View {
             // Beat-reactive vignette
             if settings.showVisualizer {
                 GeometryReader { geo in
-                    let vignetteStrength = 0.6 + Double(audioPlayer.bassEnergy) * 0.1 * settings.visualizerIntensity
+                    let vignetteStrength = AmbientVisualizerTuning.vignetteStrength(
+                        bassEnergy: audioPlayer.bassEnergy,
+                        intensity: settings.visualizerIntensity
+                    )
                     let maxDimension = max(geo.size.width, geo.size.height)
                     RadialGradient(
                         gradient: Gradient(colors: [
@@ -122,7 +139,6 @@ struct DustMoteView: View {
     private func drawParticles(context: GraphicsContext, size: CGSize, date: Date) {
         let particleCount = Int(40 * density)
         let time = date.timeIntervalSinceReferenceDate
-        let bass = Double(bassEnergy) * intensity
 
         for i in 0..<particleCount {
             let xRandom = hash(i * 7919)
@@ -138,8 +154,16 @@ struct DustMoteView: View {
             let baseOpacity = 0.15 + opacityRandom * 0.2
 
             // Beat-reactive: slight size and opacity boost
-            let particleSize = baseSize + bass * 0.5
-            let opacity = baseOpacity + bass * 0.1
+            let particleSize = AmbientVisualizerTuning.particleSize(
+                baseSize: baseSize,
+                bassEnergy: bassEnergy,
+                intensity: intensity
+            )
+            let opacity = AmbientVisualizerTuning.particleOpacity(
+                baseOpacity: baseOpacity,
+                bassEnergy: bassEnergy,
+                intensity: intensity
+            )
 
             // Slow ambient drift in random directions
             let speed = 5 + speedRandom * 10

@@ -84,6 +84,10 @@ class AudioPlayerManager: ObservableObject {
     private var window: [Float] = []
     private var smoothedBands: [Float] = Array(repeating: 0, count: 128)
     private var smoothedBassEnergy: Float = 0
+    private var previousBassMagnitudes: [Float] = []
+    private var adaptiveBassMean: Float = 0
+    private var adaptiveBassPeak: Float = 0.0001
+    private var adaptiveBassFluxPeak: Float = 0.00001
     private var lastBandsUpdateTime: CFAbsoluteTime = 0
     
     private var timer: Timer?
@@ -411,14 +415,8 @@ class AudioPlayerManager: ObservableObject {
         playerNode?.pause()
         isPlaying = false
         stopTimer()
-        
-        // Fade out frequency bands
-        for i in 0..<frequencyBands.count {
-            smoothedBands[i] = 0
-        }
-        frequencyBands = smoothedBands
-        smoothedBassEnergy = 0
-        bassEnergy = 0
+
+        resetVisualizerState()
     }
 
     func stop() {
@@ -442,11 +440,7 @@ class AudioPlayerManager: ObservableObject {
             isAccessingSecurityScope = false
         }
 
-        // Reset frequency bands
-        smoothedBands = Array(repeating: 0, count: 128)
-        frequencyBands = smoothedBands
-        smoothedBassEnergy = 0
-        bassEnergy = 0
+        resetVisualizerState()
     }
     
     func togglePlayPause() {
@@ -529,6 +523,41 @@ class AudioPlayerManager: ObservableObject {
     private func stopTimer() {
         timer?.invalidate()
         timer = nil
+    }
+
+    private func resetVisualizerState() {
+        smoothedBands = Array(repeating: 0, count: 128)
+        frequencyBands = smoothedBands
+        smoothedBassEnergy = 0
+        bassEnergy = 0
+        previousBassMagnitudes = []
+        adaptiveBassMean = 0
+        adaptiveBassPeak = 0.0001
+        adaptiveBassFluxPeak = 0.00001
+        lastBandsUpdateTime = 0
+    }
+
+    private func fftBinRange(from lowHz: Float, to highHz: Float, sampleRate: Double, halfSize: Int) -> Range<Int> {
+        let nyquist = max(Float(sampleRate) * 0.5, 1)
+        let lowBin = max(1, Int((lowHz / nyquist) * Float(halfSize)))
+        let highBin = min(halfSize, max(lowBin + 1, Int((highHz / nyquist) * Float(halfSize))))
+        return lowBin..<highBin
+    }
+
+    private func rootMeanSquare(in range: Range<Int>, from magnitudes: [Float]) -> Float {
+        guard !range.isEmpty else { return 0 }
+
+        var sum: Float = 0
+        for bin in range {
+            let value = magnitudes[bin]
+            sum += value * value
+        }
+
+        return sqrt(sum / Float(range.count))
+    }
+
+    private func clamp01(_ value: Float) -> Float {
+        min(1, max(0, value))
     }
     
     private func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
@@ -629,18 +658,38 @@ class AudioPlayerManager: ObservableObject {
                     }
                 }
 
-                // Compute bass energy from lowest 30% of bands (bass + low-mids)
-                let bassCount = max(1, bandCount * 3 / 10)
-                var peakBass: Float = 0
-                for j in 0..<bassCount {
-                    peakBass = max(peakBass, self.smoothedBands[j])
+                let bassRange = self.fftBinRange(from: 30, to: 180, sampleRate: buffer.format.sampleRate, halfSize: halfSize)
+                let subBassRange = self.fftBinRange(from: 30, to: 90, sampleRate: buffer.format.sampleRate, halfSize: halfSize)
+                let bassLevel = self.rootMeanSquare(in: bassRange, from: scaledMagnitudes) * 0.65
+                    + self.rootMeanSquare(in: subBassRange, from: scaledMagnitudes) * 0.35
+
+                var bassFlux: Float = 0
+                if self.previousBassMagnitudes.count == bassRange.count {
+                    for (offset, bin) in bassRange.enumerated() {
+                        let currentMagnitude = scaledMagnitudes[bin]
+                        bassFlux += max(0, currentMagnitude - self.previousBassMagnitudes[offset])
+                        self.previousBassMagnitudes[offset] = currentMagnitude
+                    }
+                    bassFlux /= Float(max(1, bassRange.count))
+                } else {
+                    self.previousBassMagnitudes = Array(scaledMagnitudes[bassRange])
                 }
 
-                // Smooth bass energy — fast attack to catch beats, moderate release
-                if peakBass > self.smoothedBassEnergy {
-                    self.smoothedBassEnergy = self.smoothedBassEnergy + (peakBass - self.smoothedBassEnergy) * 0.8
+                self.adaptiveBassMean = self.adaptiveBassMean + (bassLevel - self.adaptiveBassMean) * 0.03
+                self.adaptiveBassPeak = max(self.adaptiveBassPeak * 0.996, bassLevel)
+                self.adaptiveBassFluxPeak = max(self.adaptiveBassFluxPeak * 0.992, bassFlux)
+
+                let bassThreshold = self.adaptiveBassMean * 0.92
+                let normalizedBass = self.clamp01(
+                    (bassLevel - bassThreshold) / max(self.adaptiveBassPeak - bassThreshold, 0.00001)
+                )
+                let normalizedFlux = self.clamp01(bassFlux / max(self.adaptiveBassFluxPeak, 0.00001))
+                let rawBassResponse = min(1, normalizedBass * 0.18 + normalizedFlux * 0.85)
+
+                if rawBassResponse > self.smoothedBassEnergy {
+                    self.smoothedBassEnergy = self.smoothedBassEnergy + (rawBassResponse - self.smoothedBassEnergy) * 0.72
                 } else {
-                    self.smoothedBassEnergy = self.smoothedBassEnergy + (peakBass - self.smoothedBassEnergy) * 0.3
+                    self.smoothedBassEnergy = self.smoothedBassEnergy + (rawBassResponse - self.smoothedBassEnergy) * 0.25
                 }
 
                 // Throttle UI updates to ~60fps to avoid "Publishing changes from within view updates" warnings
