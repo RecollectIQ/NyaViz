@@ -7,6 +7,7 @@ import SwiftUI
 
 struct BackgroundView: View {
     @EnvironmentObject var settings: SettingsManager
+    @EnvironmentObject var audioPlayer: AudioPlayerManager
 
     // Track the previous image for crossfade
     @State private var displayedImage: NSImage?
@@ -24,10 +25,12 @@ struct BackgroundView: View {
                     Image(nsImage: prevImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: geo.size.width, height: geo.size.height)
+                        .frame(width: geo.size.width * 1.05, height: geo.size.height * 1.05)
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
                         .clipped()
                         .blur(radius: settings.backgroundBlur)
                         .opacity(settings.backgroundOpacity * (1.0 - crossfadeOpacity))
+                        .scaleEffect(settings.showVisualizer ? 1.0 + Double(audioPlayer.bassEnergy) * 0.02 * settings.visualizerIntensity : 1.0)
                 }
             }
 
@@ -37,19 +40,43 @@ struct BackgroundView: View {
                     Image(nsImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: geo.size.width, height: geo.size.height)
+                        .frame(width: geo.size.width * 1.05, height: geo.size.height * 1.05)
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
                         .clipped()
                         .blur(radius: settings.backgroundBlur)
                         .opacity(settings.backgroundOpacity * crossfadeOpacity)
+                        .scaleEffect(settings.showVisualizer ? 1.0 + Double(audioPlayer.bassEnergy) * 0.02 * settings.visualizerIntensity : 1.0)
                 }
             }
 
             // Dark overlay for better text contrast
             Color.black.opacity(0.3)
 
-            // Snowfall particles
+            // Beat-reactive vignette
+            if settings.showVisualizer {
+                GeometryReader { geo in
+                    let vignetteStrength = 0.6 + Double(audioPlayer.bassEnergy) * 0.1 * settings.visualizerIntensity
+                    let maxDimension = max(geo.size.width, geo.size.height)
+                    RadialGradient(
+                        gradient: Gradient(colors: [
+                            Color.black.opacity(0),
+                            Color.black.opacity(vignetteStrength)
+                        ]),
+                        center: .center,
+                        startRadius: maxDimension * 0.2,
+                        endRadius: maxDimension * 0.7
+                    )
+                }
+                .allowsHitTesting(false)
+            }
+
+            // Floating dust motes
             if settings.showParticles {
-                SnowfallView(density: settings.particleDensity)
+                DustMoteView(
+                    density: settings.particleDensity,
+                    bassEnergy: audioPlayer.bassEnergy,
+                    intensity: settings.showVisualizer ? settings.visualizerIntensity : 0
+                )
             }
         }
         .ignoresSafeArea()
@@ -68,11 +95,13 @@ struct BackgroundView: View {
     }
 }
 
-// MARK: - Snowfall Particle Effect
+// MARK: - Floating Dust Mote Effect
 
-struct SnowfallView: View {
+struct DustMoteView: View {
     let density: Double
-    
+    let bassEnergy: Float
+    let intensity: Double
+
     var body: some View {
         TimelineView(.animation(minimumInterval: 1/30)) { timeline in
             Canvas { context, size in
@@ -81,8 +110,7 @@ struct SnowfallView: View {
         }
         .allowsHitTesting(false)
     }
-    
-    // Simple hash function for deterministic randomness
+
     private func hash(_ n: Int) -> Double {
         var x = UInt64(abs(n) &+ 1)
         x = ((x >> 16) ^ x) &* 0x45d9f3b
@@ -90,48 +118,54 @@ struct SnowfallView: View {
         x = (x >> 16) ^ x
         return Double(x % 10000) / 10000.0
     }
-    
+
     private func drawParticles(context: GraphicsContext, size: CGSize, date: Date) {
-        let particleCount = Int(60 * density)
+        let particleCount = Int(40 * density)
         let time = date.timeIntervalSinceReferenceDate
-        
+        let bass = Double(bassEnergy) * intensity
+
         for i in 0..<particleCount {
-            // Use hash for truly scattered distribution
-            let xRandom = hash(i * 7919)  // Prime multipliers for variety
+            let xRandom = hash(i * 7919)
             let yRandom = hash(i * 6271)
             let speedRandom = hash(i * 5147)
             let sizeRandom = hash(i * 4219)
             let opacityRandom = hash(i * 3571)
-            let driftRandom = hash(i * 2957)
-            
-            // Particle properties
-            let speed = 15 + speedRandom * 25
-            let particleSize = 1.0 + sizeRandom * 2.5
-            let opacity = 0.1 + opacityRandom * 0.3
-            let driftAmount = (driftRandom - 0.5) * 40
-            
-            // Position - scattered across full width
+            let driftXRandom = hash(i * 2957)
+            let driftYRandom = hash(i * 2381)
+
+            // Base particle properties
+            let baseSize = 1.0 + sizeRandom * 2.0
+            let baseOpacity = 0.15 + opacityRandom * 0.2
+
+            // Beat-reactive: slight size and opacity boost
+            let particleSize = baseSize + bass * 0.5
+            let opacity = baseOpacity + bass * 0.1
+
+            // Slow ambient drift in random directions
+            let speed = 5 + speedRandom * 10
+            let driftAngle = driftXRandom * .pi * 2
+            let dx = cos(driftAngle) * speed
+            let dy = sin(driftAngle) * speed
+
+            // Position with gentle wandering
             let baseX = xRandom * size.width
-            let startY = yRandom * size.height
-            
-            // Falling animation with wrap-around
-            let fallDistance = time * speed
-            let y = (startY + fallDistance).truncatingRemainder(dividingBy: size.height + 50) - 25
-            
-            // Gentle horizontal drift
-            let xDrift = sin(time * 0.3 + Double(i)) * driftAmount
-            let x = baseX + xDrift
-            
-            // Skip if off-screen
-            guard x >= -10 && x <= size.width + 10 else { continue }
-            
+            let baseY = yRandom * size.height
+
+            let wanderX = sin(time * 0.2 + Double(i) * 1.7) * (20 + driftYRandom * 30)
+            let wanderY = cos(time * 0.15 + Double(i) * 2.3) * (15 + driftXRandom * 25)
+
+            let x = (baseX + dx * time.truncatingRemainder(dividingBy: 200) + wanderX)
+                .truncatingRemainder(dividingBy: size.width + 20) - 10
+            let y = (baseY + dy * time.truncatingRemainder(dividingBy: 200) + wanderY)
+                .truncatingRemainder(dividingBy: size.height + 20) - 10
+
             let rect = CGRect(
                 x: x - particleSize / 2,
                 y: y - particleSize / 2,
                 width: particleSize,
                 height: particleSize
             )
-            
+
             context.fill(
                 Circle().path(in: rect),
                 with: .color(.white.opacity(opacity))
@@ -142,5 +176,6 @@ struct SnowfallView: View {
 
 #Preview {
     BackgroundView()
+        .environmentObject(AudioPlayerManager())
         .environmentObject(SettingsManager())
 }

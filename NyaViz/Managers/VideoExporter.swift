@@ -748,10 +748,7 @@ struct CapturedSettings: Sendable {
     let lyricFontSize: CGFloat
     let lyricLinesVisible: Int
     let showVisualizer: Bool
-    let visualizerBarWidth: CGFloat
-    let visualizerBarCount: Int
-    let visualizerBarGap: CGFloat
-    let visualizerBarOpacity: Double
+    let visualizerIntensity: Double
     let colorBrightness: Double
     let dialogCharacterName: String
     let dialogMaxWidth: Double
@@ -769,10 +766,7 @@ struct CapturedSettings: Sendable {
         self.lyricFontSize = settings.lyricFontSize
         self.lyricLinesVisible = settings.lyricLinesVisible
         self.showVisualizer = settings.showVisualizer && options.includeVisualizer
-        self.visualizerBarWidth = settings.visualizerBarWidth
-        self.visualizerBarCount = settings.visualizerBarCount
-        self.visualizerBarGap = settings.visualizerBarGap
-        self.visualizerBarOpacity = settings.visualizerBarOpacity
+        self.visualizerIntensity = settings.visualizerIntensity
         self.colorBrightness = settings.colorBrightness
         self.dialogCharacterName = settings.dialogCharacterName
         self.dialogMaxWidth = settings.dialogMaxWidth
@@ -794,7 +788,8 @@ class SimulatedAudioPlayer: ObservableObject {
     @Published var currentLyricIndex: Int = -1
     @Published var isWithinLyricTimeRange: Bool = false
     @Published var frequencyBands: [Float] = Array(repeating: 0, count: 128)
-    
+    @Published var bassEnergy: Float = 0
+
     // Pre-computed random seeds for consistent visualizer animation
     private let visualizerSeeds: [Float]
     
@@ -841,6 +836,10 @@ class SimulatedAudioPlayer: ObservableObject {
             let amplitude = 0.3 + 0.3 * sin(Double(timeFloat * 2 + seed * 5))
             frequencyBands[i] = Float(max(0.05, min(0.9, amplitude * (0.5 + 0.5 * phase))))
         }
+
+        // Compute bass energy from first 20 bands
+        let bassSum = frequencyBands.prefix(20).reduce(Float(0), +)
+        bassEnergy = bassSum / 20.0
     }
     
     var progress: Double {
@@ -922,13 +921,30 @@ struct ExportableFullScreenViewStatic: View {
                         .clipped()
                         .blur(radius: capturedSettings.backgroundBlur * scale)
                         .opacity(capturedSettings.backgroundOpacity)
+                        .scaleEffect(capturedSettings.showVisualizer ? 1.0 + Double(simulatedPlayer.bassEnergy) * 0.02 * capturedSettings.visualizerIntensity : 1.0)
                 }
 
                 Color.black.opacity(0.3)
 
+                if capturedSettings.showVisualizer {
+                    let vignetteStrength = 0.6 + Double(simulatedPlayer.bassEnergy) * 0.1 * capturedSettings.visualizerIntensity
+                    let maxDimension = max(size.width, size.height)
+                    RadialGradient(
+                        gradient: Gradient(colors: [
+                            Color.black.opacity(0),
+                            Color.black.opacity(vignetteStrength)
+                        ]),
+                        center: .center,
+                        startRadius: maxDimension * 0.2,
+                        endRadius: maxDimension * 0.7
+                    )
+                }
+
                 if capturedSettings.showParticles {
-                    ExportableSnowfallViewStatic(
+                    ExportableDustMoteViewStatic(
                         density: capturedSettings.particleDensity,
+                        bassEnergy: simulatedPlayer.bassEnergy,
+                        intensity: capturedSettings.showVisualizer ? capturedSettings.visualizerIntensity : 0,
                         time: simulatedPlayer.currentTime,
                         size: size
                     )
@@ -1008,19 +1024,6 @@ struct ExportableFullScreenViewStatic: View {
                 }
             }
 
-            // Audio Visualizer - scale bar dimensions to resolution
-            if capturedSettings.showVisualizer {
-                ExportableVisualizerViewStatic(
-                    simulatedPlayer: simulatedPlayer,
-                    barWidth: capturedSettings.visualizerBarWidth * scale,
-                    barCount: capturedSettings.visualizerBarCount,
-                    barGap: capturedSettings.visualizerBarGap * scale,
-                    barOpacity: capturedSettings.visualizerBarOpacity,
-                    maxBarHeight: 60 * scale
-                )
-                .padding(.horizontal, 24 * scale)
-                .padding(.bottom, 12 * scale)
-            }
         }
         .frame(width: size.width, height: size.height)
     }
@@ -1034,57 +1037,72 @@ struct ExportableFullScreenViewStatic: View {
 
 // Static versions of subviews for thread-safe rendering
 
-struct ExportableSnowfallViewStatic: View {
+struct ExportableDustMoteViewStatic: View {
     let density: Double
+    let bassEnergy: Float
+    let intensity: Double
     let time: TimeInterval
     let size: CGSize
-    
+
     var body: some View {
         Canvas { context, _ in
-            let particleCount = Int(40 * density)
-            
-            for i in 0..<particleCount {
-                let xRandom = hash(i * 7919)
-                let yRandom = hash(i * 6271)
-                let speedRandom = hash(i * 5147)
-                let sizeRandom = hash(i * 4219)
-                let opacityRandom = hash(i * 3571)
-                let driftRandom = hash(i * 2957)
-                
-                let speed = 15 + speedRandom * 25
-                let particleSize = 1.0 + sizeRandom * 2.5
-                let opacity = 0.1 + opacityRandom * 0.3
-                let driftAmount = (driftRandom - 0.5) * 40
-                
-                let baseX = xRandom * size.width
-                let startY = yRandom * size.height
-                
-                let fallDistance = time * speed
-                let y = (startY + fallDistance).truncatingRemainder(dividingBy: size.height + 50) - 25
-                
-                let xDrift = sin(time * 0.3 + Double(i)) * driftAmount
-                let x = baseX + xDrift
-                
-                guard x >= -10 && x <= size.width + 10 else { continue }
-                
-                let rect = CGRect(
-                    x: x - particleSize / 2,
-                    y: y - particleSize / 2,
-                    width: particleSize,
-                    height: particleSize
-                )
-                
-                context.fill(Circle().path(in: rect), with: .color(.white.opacity(opacity)))
-            }
+            drawParticles(context: context, size: size)
         }
     }
-    
+
     private func hash(_ n: Int) -> Double {
         var x = UInt64(abs(n) &+ 1)
         x = ((x >> 16) ^ x) &* 0x45d9f3b
         x = ((x >> 16) ^ x) &* 0x45d9f3b
         x = (x >> 16) ^ x
         return Double(x % 10000) / 10000.0
+    }
+
+    private func drawParticles(context: GraphicsContext, size: CGSize) {
+        let particleCount = Int(40 * density)
+        let bass = Double(bassEnergy) * intensity
+
+        for i in 0..<particleCount {
+            let xRandom = hash(i * 7919)
+            let yRandom = hash(i * 6271)
+            let speedRandom = hash(i * 5147)
+            let sizeRandom = hash(i * 4219)
+            let opacityRandom = hash(i * 3571)
+            let driftXRandom = hash(i * 2957)
+            let driftYRandom = hash(i * 2381)
+
+            let baseSize = 1.0 + sizeRandom * 2.0
+            let baseOpacity = 0.15 + opacityRandom * 0.2
+            let particleSize = baseSize + bass * 0.5
+            let opacity = baseOpacity + bass * 0.1
+
+            let speed = 5 + speedRandom * 10
+            let driftAngle = driftXRandom * .pi * 2
+            let dx = cos(driftAngle) * speed
+            let dy = sin(driftAngle) * speed
+
+            let baseX = xRandom * size.width
+            let baseY = yRandom * size.height
+            let wanderX = sin(time * 0.2 + Double(i) * 1.7) * (20 + driftYRandom * 30)
+            let wanderY = cos(time * 0.15 + Double(i) * 2.3) * (15 + driftXRandom * 25)
+
+            let x = (baseX + dx * time.truncatingRemainder(dividingBy: 200) + wanderX)
+                .truncatingRemainder(dividingBy: size.width + 20) - 10
+            let y = (baseY + dy * time.truncatingRemainder(dividingBy: 200) + wanderY)
+                .truncatingRemainder(dividingBy: size.height + 20) - 10
+
+            let rect = CGRect(
+                x: x - particleSize / 2,
+                y: y - particleSize / 2,
+                width: particleSize,
+                height: particleSize
+            )
+
+            context.fill(
+                Circle().path(in: rect),
+                with: .color(.white.opacity(opacity))
+            )
+        }
     }
 }
 
@@ -1325,42 +1343,6 @@ struct ExportableDialogLyricStatic: View {
     }
 }
 
-struct ExportableVisualizerViewStatic: View {
-    let simulatedPlayer: SimulatedAudioPlayer
-    let barWidth: CGFloat
-    let barCount: Int
-    let barGap: CGFloat
-    let barOpacity: Double
-    var maxBarHeight: CGFloat = 60
-
-    private let minBarHeight: CGFloat = 2
-    
-    var body: some View {
-        HStack(alignment: .bottom, spacing: barGap) {
-            ForEach(0..<barCount, id: \.self) { index in
-                let height = symmetricBarHeight(for: index)
-                
-                RoundedRectangle(cornerRadius: barWidth / 2)
-                    .fill(Color.white.opacity(barOpacity))
-                    .frame(width: barWidth, height: height)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .frame(height: maxBarHeight)
-    }
-    
-    private func symmetricBarHeight(for index: Int) -> CGFloat {
-        let bandCount = simulatedPlayer.frequencyBands.count
-        guard bandCount > 0, barCount > 0 else { return minBarHeight }
-        
-        let halfBars = barCount / 2
-        let mirroredIndex = index < halfBars ? (halfBars - 1 - index) : (index - halfBars)
-        let bandIndex = min(Int(Float(mirroredIndex) / Float(halfBars) * Float(bandCount)), bandCount - 1)
-        let magnitude = CGFloat(simulatedPlayer.frequencyBands[bandIndex])
-        
-        return max(minBarHeight, min(maxBarHeight, minBarHeight + magnitude * (maxBarHeight - minBarHeight)))
-    }
-}
 
 // MARK: - Exportable Full Screen View (Original - uses SettingsManager)
 
@@ -1372,7 +1354,7 @@ struct ExportableFullScreenView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             // Background
-            ExportableBackgroundView(settings: settings, size: size, time: simulatedPlayer.currentTime)
+            ExportableBackgroundView(settings: settings, simulatedPlayer: simulatedPlayer, size: size, time: simulatedPlayer.currentTime)
             
             // Centered lyrics
             if simulatedPlayer.hasLyrics {
@@ -1430,12 +1412,6 @@ struct ExportableFullScreenView: View {
                 }
             }
             
-            // Audio Visualizer
-            if settings.showVisualizer {
-                ExportableVisualizerView(simulatedPlayer: simulatedPlayer, settings: settings)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 12)
-            }
         }
         .frame(width: size.width, height: size.height)
     }
@@ -1451,13 +1427,14 @@ struct ExportableFullScreenView: View {
 
 struct ExportableBackgroundView: View {
     let settings: SettingsManager
+    let simulatedPlayer: SimulatedAudioPlayer
     let size: CGSize
     let time: TimeInterval
-    
+
     var body: some View {
         ZStack {
             SettingsManager.background
-            
+
             if let image = settings.backgroundImage {
                 Image(nsImage: image)
                     .resizable()
@@ -1466,28 +1443,51 @@ struct ExportableBackgroundView: View {
                     .clipped()
                     .blur(radius: settings.backgroundBlur)
                     .opacity(settings.backgroundOpacity)
+                    .scaleEffect(settings.showVisualizer ? 1.0 + Double(simulatedPlayer.bassEnergy) * 0.02 * settings.visualizerIntensity : 1.0)
             }
-            
+
             Color.black.opacity(0.3)
-            
+
+            if settings.showVisualizer {
+                let vignetteStrength = 0.6 + Double(simulatedPlayer.bassEnergy) * 0.1 * settings.visualizerIntensity
+                let maxDimension = max(size.width, size.height)
+                RadialGradient(
+                    gradient: Gradient(colors: [
+                        Color.black.opacity(0),
+                        Color.black.opacity(vignetteStrength)
+                    ]),
+                    center: .center,
+                    startRadius: maxDimension * 0.2,
+                    endRadius: maxDimension * 0.7
+                )
+            }
+
             if settings.showParticles {
-                ExportableSnowfallView(density: settings.particleDensity, time: time, size: size)
+                ExportableDustMoteView(
+                    density: settings.particleDensity,
+                    bassEnergy: simulatedPlayer.bassEnergy,
+                    intensity: settings.showVisualizer ? settings.visualizerIntensity : 0,
+                    time: time,
+                    size: size
+                )
             }
         }
     }
 }
 
-struct ExportableSnowfallView: View {
+struct ExportableDustMoteView: View {
     let density: Double
+    let bassEnergy: Float
+    let intensity: Double
     let time: TimeInterval
     let size: CGSize
-    
+
     var body: some View {
         Canvas { context, _ in
             drawParticles(context: context, size: size)
         }
     }
-    
+
     private func hash(_ n: Int) -> Double {
         var x = UInt64(abs(n) &+ 1)
         x = ((x >> 16) ^ x) &* 0x45d9f3b
@@ -1495,42 +1495,47 @@ struct ExportableSnowfallView: View {
         x = (x >> 16) ^ x
         return Double(x % 10000) / 10000.0
     }
-    
+
     private func drawParticles(context: GraphicsContext, size: CGSize) {
-        // Reduced particle count for faster rendering
         let particleCount = Int(40 * density)
-        
+        let bass = Double(bassEnergy) * intensity
+
         for i in 0..<particleCount {
             let xRandom = hash(i * 7919)
             let yRandom = hash(i * 6271)
             let speedRandom = hash(i * 5147)
             let sizeRandom = hash(i * 4219)
             let opacityRandom = hash(i * 3571)
-            let driftRandom = hash(i * 2957)
-            
-            let speed = 15 + speedRandom * 25
-            let particleSize = 1.0 + sizeRandom * 2.5
-            let opacity = 0.1 + opacityRandom * 0.3
-            let driftAmount = (driftRandom - 0.5) * 40
-            
+            let driftXRandom = hash(i * 2957)
+            let driftYRandom = hash(i * 2381)
+
+            let baseSize = 1.0 + sizeRandom * 2.0
+            let baseOpacity = 0.15 + opacityRandom * 0.2
+            let particleSize = baseSize + bass * 0.5
+            let opacity = baseOpacity + bass * 0.1
+
+            let speed = 5 + speedRandom * 10
+            let driftAngle = driftXRandom * .pi * 2
+            let dx = cos(driftAngle) * speed
+            let dy = sin(driftAngle) * speed
+
             let baseX = xRandom * size.width
-            let startY = yRandom * size.height
-            
-            let fallDistance = time * speed
-            let y = (startY + fallDistance).truncatingRemainder(dividingBy: size.height + 50) - 25
-            
-            let xDrift = sin(time * 0.3 + Double(i)) * driftAmount
-            let x = baseX + xDrift
-            
-            guard x >= -10 && x <= size.width + 10 else { continue }
-            
+            let baseY = yRandom * size.height
+            let wanderX = sin(time * 0.2 + Double(i) * 1.7) * (20 + driftYRandom * 30)
+            let wanderY = cos(time * 0.15 + Double(i) * 2.3) * (15 + driftXRandom * 25)
+
+            let x = (baseX + dx * time.truncatingRemainder(dividingBy: 200) + wanderX)
+                .truncatingRemainder(dividingBy: size.width + 20) - 10
+            let y = (baseY + dy * time.truncatingRemainder(dividingBy: 200) + wanderY)
+                .truncatingRemainder(dividingBy: size.height + 20) - 10
+
             let rect = CGRect(
                 x: x - particleSize / 2,
                 y: y - particleSize / 2,
                 width: particleSize,
                 height: particleSize
             )
-            
+
             context.fill(
                 Circle().path(in: rect),
                 with: .color(.white.opacity(opacity))
@@ -1674,49 +1679,3 @@ struct ExportableLyricLine: View {
     }
 }
 
-// MARK: - Exportable Visualizer
-
-struct ExportableVisualizerView: View {
-    let simulatedPlayer: SimulatedAudioPlayer
-    let settings: SettingsManager
-    
-    private let maxBarHeight: CGFloat = 60
-    private let minBarHeight: CGFloat = 2
-    
-    var body: some View {
-        HStack(alignment: .bottom, spacing: settings.visualizerBarGap) {
-            ForEach(0..<settings.visualizerBarCount, id: \.self) { index in
-                let height = symmetricBarHeight(for: index)
-                
-                RoundedRectangle(cornerRadius: settings.visualizerBarWidth / 2)
-                    .fill(Color.white.opacity(settings.visualizerBarOpacity))
-                    .frame(width: settings.visualizerBarWidth, height: height)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .frame(height: maxBarHeight)
-    }
-    
-    private func symmetricBarHeight(for index: Int) -> CGFloat {
-        let bandCount = simulatedPlayer.frequencyBands.count
-        guard bandCount > 0, settings.visualizerBarCount > 0 else { return minBarHeight }
-        
-        let barCount = settings.visualizerBarCount
-        let halfBars = barCount / 2
-        
-        let mirroredIndex: Int
-        if index < halfBars {
-            mirroredIndex = halfBars - 1 - index
-        } else {
-            mirroredIndex = index - halfBars
-        }
-        
-        let bandIndex = Int(Float(mirroredIndex) / Float(halfBars) * Float(bandCount))
-        let clampedIndex = min(bandIndex, bandCount - 1)
-        
-        let magnitude = CGFloat(simulatedPlayer.frequencyBands[clampedIndex])
-        let height = minBarHeight + magnitude * (maxBarHeight - minBarHeight)
-        
-        return max(minBarHeight, min(maxBarHeight, height))
-    }
-}

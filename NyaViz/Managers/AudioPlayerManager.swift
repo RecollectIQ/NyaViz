@@ -61,7 +61,8 @@ class AudioPlayerManager: ObservableObject {
     
     // Frequency bands for visualizer (normalized 0-1)
     @Published var frequencyBands: [Float] = Array(repeating: 0, count: 128)
-    
+    @Published var bassEnergy: Float = 0
+
     // Audio engine components
     private var audioEngine: AVAudioEngine?
     private var playerNode: AVAudioPlayerNode?
@@ -82,6 +83,7 @@ class AudioPlayerManager: ObservableObject {
     private var imaginaryPart: [Float] = []
     private var window: [Float] = []
     private var smoothedBands: [Float] = Array(repeating: 0, count: 128)
+    private var smoothedBassEnergy: Float = 0
     private var lastBandsUpdateTime: CFAbsoluteTime = 0
     
     private var timer: Timer?
@@ -415,8 +417,10 @@ class AudioPlayerManager: ObservableObject {
             smoothedBands[i] = 0
         }
         frequencyBands = smoothedBands
+        smoothedBassEnergy = 0
+        bassEnergy = 0
     }
-    
+
     func stop() {
         playerNode?.stop()
         audioEngine?.mainMixerNode.removeTap(onBus: 0)
@@ -441,6 +445,8 @@ class AudioPlayerManager: ObservableObject {
         // Reset frequency bands
         smoothedBands = Array(repeating: 0, count: 128)
         frequencyBands = smoothedBands
+        smoothedBassEnergy = 0
+        bassEnergy = 0
     }
     
     func togglePlayPause() {
@@ -622,7 +628,21 @@ class AudioPlayerManager: ObservableObject {
                         self.smoothedBands[i] = self.smoothedBands[i] + (bands[i] - self.smoothedBands[i]) * releaseSpeed
                     }
                 }
-                
+
+                // Compute bass energy from lowest 30% of bands (bass + low-mids)
+                let bassCount = max(1, bandCount * 3 / 10)
+                var peakBass: Float = 0
+                for j in 0..<bassCount {
+                    peakBass = max(peakBass, self.smoothedBands[j])
+                }
+
+                // Smooth bass energy — fast attack to catch beats, moderate release
+                if peakBass > self.smoothedBassEnergy {
+                    self.smoothedBassEnergy = self.smoothedBassEnergy + (peakBass - self.smoothedBassEnergy) * 0.8
+                } else {
+                    self.smoothedBassEnergy = self.smoothedBassEnergy + (peakBass - self.smoothedBassEnergy) * 0.3
+                }
+
                 // Throttle UI updates to ~60fps to avoid "Publishing changes from within view updates" warnings
                 let now = CFAbsoluteTimeGetCurrent()
                 if now - self.lastBandsUpdateTime >= 0.016 {
@@ -630,6 +650,7 @@ class AudioPlayerManager: ObservableObject {
                     let resultBands = self.smoothedBands
                     Task { @MainActor [weak self] in
                         self?.frequencyBands = resultBands
+                        self?.bassEnergy = self?.smoothedBassEnergy ?? 0
                     }
                 }
             }

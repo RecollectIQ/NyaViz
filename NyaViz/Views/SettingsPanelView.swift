@@ -101,7 +101,7 @@ struct SettingsPanelView: View {
                                 )
                                 
                                 // Particles
-                                SettingsToggle(title: "Snow Particles", isOn: $settings.showParticles)
+                                SettingsToggle(title: "Particles", isOn: $settings.showParticles)
                                 
                                 if settings.showParticles {
                                     SettingsSlider(
@@ -202,30 +202,12 @@ struct SettingsPanelView: View {
                         SettingsSection(title: "Visualizer") {
                             VStack(spacing: 12) {
                                 SettingsToggle(title: "Show Visualizer", isOn: $settings.showVisualizer)
-                                
+
                                 if settings.showVisualizer {
                                     SettingsSlider(
-                                        title: "Bar Width",
-                                        value: $settings.visualizerBarWidth,
-                                        range: 2...12
-                                    )
-                                    
-                                    SettingsIntSlider(
-                                        title: "Bar Count",
-                                        value: $settings.visualizerBarCount,
-                                        range: 8...120
-                                    )
-                                    
-                                    SettingsSlider(
-                                        title: "Bar Gap",
-                                        value: $settings.visualizerBarGap,
-                                        range: 1...10
-                                    )
-                                    
-                                    SettingsSlider(
-                                        title: "Opacity",
-                                        value: $settings.visualizerBarOpacity,
-                                        range: 0.1...1.0
+                                        title: "Intensity",
+                                        value: $settings.visualizerIntensity,
+                                        range: 0.0...1.0
                                     )
                                 }
                             }

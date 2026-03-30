@@ -85,12 +85,6 @@ struct FullScreenLyricsView: View {
                     }
                 }
                 
-                // Audio Visualizer at the bottom
-                if settings.showVisualizer {
-                    AudioVisualizerView()
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 12)
-                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -517,10 +511,10 @@ struct ExportOptionsSheet: View {
                 // Visualizer toggle
                 Toggle(isOn: $videoExporter.exportOptions.includeVisualizer) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Include Audio Visualizer")
+                        Text("Include Visualizer Effects")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white)
-                        Text("Shows frequency bars at bottom")
+                        Text("Beat-reactive breathing and vignette")
                             .font(.system(size: 11))
                             .foregroundColor(.white.opacity(0.5))
                     }
@@ -531,10 +525,10 @@ struct ExportOptionsSheet: View {
                 // Particles toggle
                 Toggle(isOn: $videoExporter.exportOptions.includeParticles) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Include Snow Particles")
+                        Text("Include Particles")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white)
-                        Text("Animated falling particles")
+                        Text("Floating dust motes")
                             .font(.system(size: 11))
                             .foregroundColor(.white.opacity(0.5))
                     }

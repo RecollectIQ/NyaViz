@@ -13,16 +13,7 @@ struct MainPlayerView: View {
         GeometryReader { geo in
             if settings.verticalLayout {
                 // Vertical Layout - Title top, lyrics center, controls bottom on hover
-                ZStack(alignment: .bottom) {
-                    VerticalModeView()
-                    
-                    // Audio Visualizer at the bottom (full width in vertical mode)
-                    if settings.showVisualizer {
-                        AudioVisualizerView()
-                            .padding(.horizontal, 24)
-                            .padding(.bottom, 12)
-                    }
-                }
+                VerticalModeView()
             } else {
                 // Horizontal Layout - Original
                 HStack(spacing: 0) {
@@ -67,19 +58,9 @@ struct MainPlayerView: View {
                         .fill(Color.white.opacity(0.06))
                         .frame(width: 1)
                     
-                    // Right Panel - Lyrics with Visualizer
-                    ZStack(alignment: .bottom) {
-                        LyricsView()
-                            .frame(maxWidth: .infinity)
-                        
-                        // Audio Visualizer centered in lyrics area
-                        if settings.showVisualizer {
-                            AudioVisualizerView()
-                                .padding(.horizontal, 24)
-                                .padding(.bottom, 12)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
+                    // Right Panel - Lyrics
+                    LyricsView()
+                        .frame(maxWidth: .infinity)
                 }
             }
         }

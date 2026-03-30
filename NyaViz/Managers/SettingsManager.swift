@@ -26,10 +26,7 @@ class SettingsManager: ObservableObject {
         static let dialogPosition = "dialogPosition"
         // Visualizer
         static let showVisualizer = "showVisualizer"
-        static let visualizerBarWidth = "visualizerBarWidth"
-        static let visualizerBarCount = "visualizerBarCount"
-        static let visualizerBarGap = "visualizerBarGap"
-        static let visualizerBarOpacity = "visualizerBarOpacity"
+        static let visualizerIntensity = "visualizerIntensity"
         // Color styling
         static let colorBrightness = "colorBrightness"
     }
@@ -105,17 +102,8 @@ class SettingsManager: ObservableObject {
     @Published var showVisualizer: Bool = true {
         didSet { defaults.set(showVisualizer, forKey: Keys.showVisualizer) }
     }
-    @Published var visualizerBarWidth: CGFloat = 4 {
-        didSet { defaults.set(Double(visualizerBarWidth), forKey: Keys.visualizerBarWidth) }
-    }
-    @Published var visualizerBarCount: Int = 48 {
-        didSet { defaults.set(visualizerBarCount, forKey: Keys.visualizerBarCount) }
-    }
-    @Published var visualizerBarGap: CGFloat = 3 {
-        didSet { defaults.set(Double(visualizerBarGap), forKey: Keys.visualizerBarGap) }
-    }
-    @Published var visualizerBarOpacity: Double = 0.5 {
-        didSet { defaults.set(visualizerBarOpacity, forKey: Keys.visualizerBarOpacity) }
+    @Published var visualizerIntensity: Double = 0.5 {
+        didSet { defaults.set(visualizerIntensity, forKey: Keys.visualizerIntensity) }
     }
     
     // Static colors
@@ -194,17 +182,8 @@ class SettingsManager: ObservableObject {
         if defaults.object(forKey: Keys.showVisualizer) != nil {
             showVisualizer = defaults.bool(forKey: Keys.showVisualizer)
         }
-        if defaults.object(forKey: Keys.visualizerBarWidth) != nil {
-            visualizerBarWidth = CGFloat(defaults.double(forKey: Keys.visualizerBarWidth))
-        }
-        if defaults.object(forKey: Keys.visualizerBarCount) != nil {
-            visualizerBarCount = defaults.integer(forKey: Keys.visualizerBarCount)
-        }
-        if defaults.object(forKey: Keys.visualizerBarGap) != nil {
-            visualizerBarGap = CGFloat(defaults.double(forKey: Keys.visualizerBarGap))
-        }
-        if defaults.object(forKey: Keys.visualizerBarOpacity) != nil {
-            visualizerBarOpacity = defaults.double(forKey: Keys.visualizerBarOpacity)
+        if defaults.object(forKey: Keys.visualizerIntensity) != nil {
+            visualizerIntensity = defaults.double(forKey: Keys.visualizerIntensity)
         }
         
         // Load cached images from app support directory
