@@ -6,18 +6,21 @@
 import Foundation
 
 enum AmbientVisualizerTuning {
-    static let baseVignetteStrength = 0.6
+    static let backgroundFrameExpansion = 1.11
     static let backgroundScaleAmount = 0.035
-    static let vignetteBoostAmount = 0.16
     static let particleSizeBoost = 0.8
     static let particleOpacityBoost = 0.14
 
-    static func backgroundScale(bassEnergy: Float, intensity: Double) -> Double {
-        1.0 + Double(bassEnergy) * backgroundScaleAmount * intensity
+    static func backgroundDrift(size: CGSize, time: TimeInterval) -> CGSize {
+        let diagonalOffset = sin(time * 0.42)
+        return CGSize(
+            width: diagonalOffset * size.width * 0.015,
+            height: diagonalOffset * size.height * 0.015
+        )
     }
 
-    static func vignetteStrength(bassEnergy: Float, intensity: Double) -> Double {
-        baseVignetteStrength + Double(bassEnergy) * vignetteBoostAmount * intensity
+    static func backgroundScale(bassEnergy: Float, intensity: Double) -> Double {
+        1.0 + Double(bassEnergy) * backgroundScaleAmount * intensity
     }
 
     static func particleSize(baseSize: Double, bassEnergy: Float, intensity: Double) -> Double {

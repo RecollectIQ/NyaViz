@@ -22,11 +22,19 @@ struct BackgroundView: View {
             // Previous image (fading out during crossfade)
             if let prevImage = previousImage {
                 GeometryReader { geo in
+                    let drift = AmbientVisualizerTuning.backgroundDrift(
+                        size: geo.size,
+                        time: audioPlayer.currentTime
+                    )
                     Image(nsImage: prevImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: geo.size.width * 1.05, height: geo.size.height * 1.05)
+                        .frame(
+                            width: geo.size.width * AmbientVisualizerTuning.backgroundFrameExpansion,
+                            height: geo.size.height * AmbientVisualizerTuning.backgroundFrameExpansion
+                        )
                         .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                        .offset(drift)
                         .clipped()
                         .blur(radius: settings.backgroundBlur)
                         .opacity(settings.backgroundOpacity * (1.0 - crossfadeOpacity))
@@ -44,11 +52,19 @@ struct BackgroundView: View {
             // Current background image (fading in)
             if let image = displayedImage {
                 GeometryReader { geo in
+                    let drift = AmbientVisualizerTuning.backgroundDrift(
+                        size: geo.size,
+                        time: audioPlayer.currentTime
+                    )
                     Image(nsImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: geo.size.width * 1.05, height: geo.size.height * 1.05)
+                        .frame(
+                            width: geo.size.width * AmbientVisualizerTuning.backgroundFrameExpansion,
+                            height: geo.size.height * AmbientVisualizerTuning.backgroundFrameExpansion
+                        )
                         .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                        .offset(drift)
                         .clipped()
                         .blur(radius: settings.backgroundBlur)
                         .opacity(settings.backgroundOpacity * crossfadeOpacity)
@@ -65,27 +81,6 @@ struct BackgroundView: View {
 
             // Dark overlay for better text contrast
             Color.black.opacity(0.3)
-
-            // Beat-reactive vignette
-            if settings.showVisualizer {
-                GeometryReader { geo in
-                    let vignetteStrength = AmbientVisualizerTuning.vignetteStrength(
-                        bassEnergy: audioPlayer.bassEnergy,
-                        intensity: settings.visualizerIntensity
-                    )
-                    let maxDimension = max(geo.size.width, geo.size.height)
-                    RadialGradient(
-                        gradient: Gradient(colors: [
-                            Color.black.opacity(0),
-                            Color.black.opacity(vignetteStrength)
-                        ]),
-                        center: .center,
-                        startRadius: maxDimension * 0.2,
-                        endRadius: maxDimension * 0.7
-                    )
-                }
-                .allowsHitTesting(false)
-            }
 
             // Floating dust motes
             if settings.showParticles {

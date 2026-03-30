@@ -914,10 +914,18 @@ struct ExportableFullScreenViewStatic: View {
                 SettingsManager.background
 
                 if let image = backgroundImage {
+                    let drift = AmbientVisualizerTuning.backgroundDrift(
+                        size: size,
+                        time: simulatedPlayer.currentTime
+                    )
                     Image(nsImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: size.width, height: size.height)
+                        .frame(
+                            width: size.width * AmbientVisualizerTuning.backgroundFrameExpansion,
+                            height: size.height * AmbientVisualizerTuning.backgroundFrameExpansion
+                        )
+                        .offset(drift)
                         .clipped()
                         .blur(radius: capturedSettings.backgroundBlur * scale)
                         .opacity(capturedSettings.backgroundOpacity)
@@ -932,23 +940,6 @@ struct ExportableFullScreenViewStatic: View {
                 }
 
                 Color.black.opacity(0.3)
-
-                if capturedSettings.showVisualizer {
-                    let vignetteStrength = AmbientVisualizerTuning.vignetteStrength(
-                        bassEnergy: simulatedPlayer.bassEnergy,
-                        intensity: capturedSettings.visualizerIntensity
-                    )
-                    let maxDimension = max(size.width, size.height)
-                    RadialGradient(
-                        gradient: Gradient(colors: [
-                            Color.black.opacity(0),
-                            Color.black.opacity(vignetteStrength)
-                        ]),
-                        center: .center,
-                        startRadius: maxDimension * 0.2,
-                        endRadius: maxDimension * 0.7
-                    )
-                }
 
                 if capturedSettings.showParticles {
                     ExportableDustMoteViewStatic(
@@ -1453,10 +1444,15 @@ struct ExportableBackgroundView: View {
             SettingsManager.background
 
             if let image = settings.backgroundImage {
+                let drift = AmbientVisualizerTuning.backgroundDrift(size: size, time: time)
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: size.width, height: size.height)
+                    .frame(
+                        width: size.width * AmbientVisualizerTuning.backgroundFrameExpansion,
+                        height: size.height * AmbientVisualizerTuning.backgroundFrameExpansion
+                    )
+                    .offset(drift)
                     .clipped()
                     .blur(radius: settings.backgroundBlur)
                     .opacity(settings.backgroundOpacity)
@@ -1471,23 +1467,6 @@ struct ExportableBackgroundView: View {
             }
 
             Color.black.opacity(0.3)
-
-            if settings.showVisualizer {
-                let vignetteStrength = AmbientVisualizerTuning.vignetteStrength(
-                    bassEnergy: simulatedPlayer.bassEnergy,
-                    intensity: settings.visualizerIntensity
-                )
-                let maxDimension = max(size.width, size.height)
-                RadialGradient(
-                    gradient: Gradient(colors: [
-                        Color.black.opacity(0),
-                        Color.black.opacity(vignetteStrength)
-                    ]),
-                    center: .center,
-                    startRadius: maxDimension * 0.2,
-                    endRadius: maxDimension * 0.7
-                )
-            }
 
             if settings.showParticles {
                 ExportableDustMoteView(
