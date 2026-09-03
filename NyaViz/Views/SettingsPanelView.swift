@@ -10,6 +10,9 @@ import AppKit
 struct SettingsPanelView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
+    @EnvironmentObject var inbox: InboxWatcher
+
+    @State private var didCopyInboxPath = false
     
     private var linesLabel: String {
         switch settings.lyricLinesVisible {
@@ -70,6 +73,43 @@ struct SettingsPanelView: View {
                                     subtitle: audioPlayer.hasLyrics ? "\(audioPlayer.lyrics.count) lines" : "No file"
                                 ) {
                                     openSRTFile()
+                                }
+
+                                // The drop folder agents and scripts write into.
+                                // Sandboxing means the user has to pick it, so
+                                // the app is granted access to that location.
+                                if let inboxURL = inbox.inboxDirectory {
+                                    SettingsButton(
+                                        icon: "tray.and.arrow.down",
+                                        title: "Agent Inbox",
+                                        subtitle: inboxURL.path
+                                    ) {
+                                        NSWorkspace.shared.activateFileViewerSelecting([inboxURL])
+                                    }
+
+                                    SettingsButton(
+                                        icon: didCopyInboxPath ? "checkmark" : "doc.on.doc",
+                                        title: "Copy Inbox Path",
+                                        subtitle: didCopyInboxPath ? "Copied" : "For handing to an agent"
+                                    ) {
+                                        copyInboxPath(inboxURL)
+                                    }
+
+                                    SettingsButton(
+                                        icon: "folder.badge.gearshape",
+                                        title: "Change Inbox Folder",
+                                        subtitle: "Pick a different location"
+                                    ) {
+                                        inbox.chooseFolder()
+                                    }
+                                } else {
+                                    SettingsButton(
+                                        icon: "tray.and.arrow.down",
+                                        title: "Set Up Agent Inbox",
+                                        subtitle: "Choose a drop folder…"
+                                    ) {
+                                        inbox.chooseFolder()
+                                    }
                                 }
                             }
                         }
@@ -251,6 +291,17 @@ struct SettingsPanelView: View {
         }
     }
     
+    /// Puts the inbox path on the clipboard so it can be handed to an agent.
+    private func copyInboxPath(_ url: URL) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.path, forType: .string)
+        withAnimation { didCopyInboxPath = true }
+        Task {
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            withAnimation { didCopyInboxPath = false }
+        }
+    }
+
     private func openSRTFile() {
         let panel = NSOpenPanel()
         // Support both .srt and .nyaviz formats

@@ -5,12 +5,14 @@
 
 import SwiftUI
 import CoreText
+import AppKit
 
 @main
 struct NyaVizApp: App {
     @StateObject private var audioPlayer = AudioPlayerManager()
     @StateObject private var settingsManager = SettingsManager()
     @StateObject private var libraryManager = LibraryManager()
+    @StateObject private var inboxWatcher = InboxWatcher()
 
     init() {
         // Register custom fonts
@@ -46,6 +48,7 @@ struct NyaVizApp: App {
                 .environmentObject(audioPlayer)
                 .environmentObject(settingsManager)
                 .environmentObject(libraryManager)
+                .environmentObject(inboxWatcher)
                 .frame(minWidth: 900, minHeight: 600)
                 .task {
                     // Wire the settings and library references so AudioPlayerManager can apply
@@ -53,6 +56,9 @@ struct NyaVizApp: App {
                     // after the first render.
                     audioPlayer.settingsRef = settingsManager
                     audioPlayer.libraryRef = libraryManager
+
+                    // Begin importing anything agents write into the inbox folder.
+                    inboxWatcher.start(library: libraryManager, audioPlayer: audioPlayer)
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -67,6 +73,22 @@ struct NyaVizApp: App {
                     audioPlayer.showSRTPicker = true
                 }
                 .keyboardShortcut("L", modifiers: .command)
+
+                Divider()
+
+                // One-time setup, so it belongs somewhere findable rather than
+                // behind a hover-revealed button in the settings panel.
+                Button(inboxWatcher.isConfigured ? "Change Agent Inbox Folder..." : "Set Up Agent Inbox...") {
+                    inboxWatcher.chooseFolder()
+                }
+
+                if inboxWatcher.isConfigured {
+                    Button("Reveal Agent Inbox in Finder") {
+                        if let url = inboxWatcher.inboxDirectory {
+                            NSWorkspace.shared.activateFileViewerSelecting([url])
+                        }
+                    }
+                }
             }
         }
     }

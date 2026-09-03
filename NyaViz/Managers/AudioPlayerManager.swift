@@ -254,6 +254,20 @@ class AudioPlayerManager: ObservableObject {
         }
     }
     
+    /// Re-reads lyrics for the track that is already playing, without writing them
+    /// back into the library.
+    ///
+    /// ``loadSRT(from:)`` normally copies the file it loads into the current
+    /// library entry.  When the source file *is* that entry's lyrics file — as it
+    /// is when an external writer replaces them on disk — that copy would delete
+    /// the file and then fail to copy it back.  Setting `isLoadingFromLibrary`
+    /// suppresses the re-import.
+    func reloadLyricsFromLibrary(at url: URL) {
+        isLoadingFromLibrary = true
+        defer { isLoadingFromLibrary = false }
+        loadSRT(from: url)
+    }
+
     /// Load a library entry (audio + lyrics) and immediately start playback.
     func loadLibraryEntry(_ entry: LibraryEntry) {
         guard let library = libraryRef else { return }
