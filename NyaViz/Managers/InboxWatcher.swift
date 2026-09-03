@@ -3,6 +3,7 @@
 //  NyaViz
 //
 
+import AppKit
 import Foundation
 import Combine
 
@@ -14,9 +15,16 @@ import Combine
 /// audio file and/or a `.nyaviz`/`.srt` file and it gets imported.  No manifest,
 /// no JSON, no fixed filenames.
 ///
+/// The folder is chosen by the user rather than fixed by the app.  NyaViz is
+/// sandboxed, so a folder inside its container would be unreachable to the very
+/// tools this feature exists for — macOS blocks other processes from reading or
+/// writing an app's container.  Instead the user picks an ordinary folder once
+/// (`~/Music/NyaViz Inbox`, say); the choice is persisted as a security-scoped
+/// bookmark so access survives relaunches.
+///
 /// ```
-/// ~/Library/Application Support/NyaViz/Inbox/
-/// ├── README.md          # written on first launch; documents the contract
+/// <chosen folder>/
+/// ├── README.md          # written when the folder is chosen; documents the contract
 /// ├── status.json        # append-only log of import results
 /// ├── .processed/        # successfully imported drops are moved here
 /// └── My Song/           # a drop
@@ -68,32 +76,35 @@ final class InboxWatcher: ObservableObject {
     /// drop is retried — and reported again — once it changes on disk.
     private var reportedFailures: [String: Date] = [:]
 
-    // MARK: - Paths
+    // MARK: - Chosen Folder
 
-    /// `~/Library/Application Support/NyaViz/Inbox/`
-    ///
-    /// Derived from the same base as ``LibraryManager/libraryDirectory`` so the
-    /// two stay together if the app is ever sandboxed into a container.
-    var inboxDirectory: URL {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first!
-        return appSupport
-            .appendingPathComponent("NyaViz", isDirectory: true)
-            .appendingPathComponent("Inbox", isDirectory: true)
+    /// The folder currently being watched, or `nil` if the user has not picked one.
+    @Published private(set) var inboxDirectory: URL?
+
+    /// Whether an inbox folder is configured and accessible.
+    var isConfigured: Bool { inboxDirectory != nil }
+
+    /// Path shown in Settings, or a prompt when unset.
+    var displayPath: String {
+        inboxDirectory?.path ?? "Choose a folder…"
     }
 
-    private var processedDirectory: URL {
-        inboxDirectory.appendingPathComponent(".processed", isDirectory: true)
+    private let bookmarkDefaultsKey = "inboxFolderBookmark"
+
+    /// Tracks whether we currently hold security-scoped access, so it is
+    /// released exactly once.
+    private var isAccessingScope = false
+
+    private func processedDirectory(in folder: URL) -> URL {
+        folder.appendingPathComponent(".processed", isDirectory: true)
     }
 
-    private var statusFileURL: URL {
-        inboxDirectory.appendingPathComponent("status.json")
+    private func statusFileURL(in folder: URL) -> URL {
+        folder.appendingPathComponent("status.json")
     }
 
-    private var readmeURL: URL {
-        inboxDirectory.appendingPathComponent("README.md")
+    private func readmeURL(in folder: URL) -> URL {
+        folder.appendingPathComponent("README.md")
     }
 
     /// Names that are inbox infrastructure rather than droppable content.
@@ -103,17 +114,12 @@ final class InboxWatcher: ObservableObject {
 
     // MARK: - Lifecycle
 
-    /// Creates the inbox if needed, imports anything already sitting in it, and
-    /// begins watching for new drops.
+    /// Wires up dependencies and resumes watching the previously chosen folder,
+    /// if there is one.  Does nothing visible until the user picks a folder.
     func start(library: LibraryManager, audioPlayer: AudioPlayerManager) {
         self.library = library
         self.audioPlayer = audioPlayer
-
-        prepareDirectory()
-        beginWatching()
-
-        // Pick up anything written while the app was closed.
-        scheduleScan()
+        restoreSavedFolder()
     }
 
     func stop() {
@@ -121,30 +127,114 @@ final class InboxWatcher: ObservableObject {
         debounceTask = nil
         source?.cancel()
         source = nil
+        releaseScope()
     }
 
     deinit {
         source?.cancel()
     }
 
+    // MARK: - Folder Selection
+
+    /// Asks the user to pick the inbox folder, then persists and starts watching it.
+    ///
+    /// The sandbox grants access to whatever the user selects in the panel; the
+    /// security-scoped bookmark is what makes that access survive a relaunch.
+    func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Use as Inbox"
+        panel.message = "Choose a folder for agents and scripts to drop tracks and lyrics into."
+        panel.directoryURL = FileManager.default.urls(for: .musicDirectory, in: .userDomainMask).first
+
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+        adopt(folder, persistBookmark: true)
+    }
+
+    /// Stops watching and forgets the chosen folder. Files already imported into
+    /// the library are unaffected.
+    func clearFolder() {
+        stop()
+        inboxDirectory = nil
+        reportedFailures.removeAll()
+        UserDefaults.standard.removeObject(forKey: bookmarkDefaultsKey)
+    }
+
+    /// Re-opens the folder the user chose in a previous session.
+    private func restoreSavedFolder() {
+        guard let data = UserDefaults.standard.data(forKey: bookmarkDefaultsKey) else { return }
+
+        var isStale = false
+        guard let folder = try? URL(
+            resolvingBookmarkData: data,
+            options: [.withSecurityScope],
+            relativeTo: nil,
+            bookmarkDataIsStale: &isStale
+        ) else {
+            // The folder was deleted or moved beyond recovery.
+            UserDefaults.standard.removeObject(forKey: bookmarkDefaultsKey)
+            return
+        }
+
+        // A stale bookmark still resolves, but needs re-minting to keep working.
+        adopt(folder, persistBookmark: isStale)
+    }
+
+    /// Begins using `folder` as the inbox.
+    private func adopt(_ folder: URL, persistBookmark: Bool) {
+        stop()
+
+        guard folder.startAccessingSecurityScopedResource() else { return }
+        isAccessingScope = true
+        inboxDirectory = folder
+
+        if persistBookmark,
+           let data = try? folder.bookmarkData(
+               options: [.withSecurityScope],
+               includingResourceValuesForKeys: nil,
+               relativeTo: nil
+           ) {
+            UserDefaults.standard.set(data, forKey: bookmarkDefaultsKey)
+        }
+
+        prepareDirectory(folder)
+        beginWatching(folder)
+
+        // Pick up anything written while the app was closed.
+        scheduleScan()
+    }
+
+    private func releaseScope() {
+        if isAccessingScope, let folder = inboxDirectory {
+            folder.stopAccessingSecurityScopedResource()
+        }
+        isAccessingScope = false
+    }
+
     // MARK: - Setup
 
-    private func prepareDirectory() {
+    private func prepareDirectory(_ folder: URL) {
         let fm = FileManager.default
-        try? fm.createDirectory(at: inboxDirectory, withIntermediateDirectories: true)
-        try? fm.createDirectory(at: processedDirectory, withIntermediateDirectories: true)
+        try? fm.createDirectory(at: processedDirectory(in: folder), withIntermediateDirectories: true)
 
         // Write the contract next to the folder it describes, so an agent that
         // finds the directory can discover how to use it without other docs.
-        if !fm.fileExists(atPath: readmeURL.path) {
-            try? Self.readmeContents.write(to: readmeURL, atomically: true, encoding: .utf8)
+        let readme = readmeURL(in: folder)
+        if !fm.fileExists(atPath: readme.path) {
+            try? Self.readmeContents.write(to: readme, atomically: true, encoding: .utf8)
         }
     }
 
-    private func beginWatching() {
-        stop()
+    private func beginWatching(_ folder: URL) {
+        debounceTask?.cancel()
+        debounceTask = nil
+        source?.cancel()
+        source = nil
 
-        descriptor = open(inboxDirectory.path, O_EVTONLY)
+        descriptor = open(folder.path, O_EVTONLY)
         guard descriptor >= 0 else { return }
 
         let source = DispatchSource.makeFileSystemObjectSource(
@@ -177,11 +267,12 @@ final class InboxWatcher: ObservableObject {
     }
 
     private func scan() {
+        guard let folder = inboxDirectory else { return }
         let fm = FileManager.default
         // Skipping hidden files keeps `.processed/`, `.DS_Store` and AppleDouble
         // `._` stubs from being mistaken for drops.
         guard let contents = try? fm.contentsOfDirectory(
-            at: inboxDirectory,
+            at: folder,
             includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
             options: .skipsHiddenFiles
         ) else { return }
@@ -214,7 +305,7 @@ final class InboxWatcher: ObservableObject {
         }
 
         if !results.isEmpty {
-            recordStatus(results)
+            recordStatus(results, in: folder)
         }
 
         // A directory event does not fire for writes *inside* a sub-folder, so
@@ -375,8 +466,10 @@ final class InboxWatcher: ObservableObject {
     /// are small and silently deleting someone's files is worse than a folder
     /// they can empty themselves.
     private func archive(_ drop: URL) {
+        guard let folder = inboxDirectory else { return }
+        let processed = processedDirectory(in: folder)
         let fm = FileManager.default
-        var destination = processedDirectory.appendingPathComponent(drop.lastPathComponent)
+        var destination = processed.appendingPathComponent(drop.lastPathComponent)
 
         // Never clobber an earlier drop of the same name.
         if fm.fileExists(atPath: destination.path) {
@@ -385,7 +478,7 @@ final class InboxWatcher: ObservableObject {
             let base = drop.deletingPathExtension().lastPathComponent
             let ext = drop.pathExtension
             let unique = ext.isEmpty ? "\(base) \(stamp)" : "\(base) \(stamp).\(ext)"
-            destination = processedDirectory.appendingPathComponent(unique)
+            destination = processed.appendingPathComponent(unique)
         }
         try? fm.moveItem(at: drop, to: destination)
     }
@@ -393,15 +486,16 @@ final class InboxWatcher: ObservableObject {
     // MARK: - Status Reporting
 
     /// Appends results to `status.json` so the writer can confirm what happened.
-    private func recordStatus(_ results: [ImportResult]) {
+    private func recordStatus(_ results: [ImportResult], in folder: URL) {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
 
+        let statusURL = statusFileURL(in: folder)
         var history: [ImportResult] = []
-        if let data = try? Data(contentsOf: statusFileURL),
+        if let data = try? Data(contentsOf: statusURL),
            let existing = try? decoder.decode(StatusFile.self, from: data) {
             history = existing.results
         }
@@ -412,7 +506,7 @@ final class InboxWatcher: ObservableObject {
 
         let file = StatusFile(updated: Date(), results: history)
         if let data = try? encoder.encode(file) {
-            try? data.write(to: statusFileURL, options: .atomic)
+            try? data.write(to: statusURL, options: .atomic)
         }
 
         for result in results {
@@ -484,6 +578,11 @@ extension InboxWatcher {
     Anything written into this folder is imported into the NyaViz library
     automatically. This is the supported way for scripts and agents to add
     tracks and lyrics without driving the app's UI.
+
+    NyaViz is sandboxed, so this folder is one you chose rather than a fixed
+    path inside the app's container — the container is not reachable by other
+    processes. Settings -> Files -> Copy Inbox Path gives you the current
+    location; Change Inbox Folder moves it.
 
     ## Adding a track
 

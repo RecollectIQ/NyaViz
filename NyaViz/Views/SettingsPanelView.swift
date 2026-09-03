@@ -76,20 +76,40 @@ struct SettingsPanelView: View {
                                 }
 
                                 // The drop folder agents and scripts write into.
-                                SettingsButton(
-                                    icon: "tray.and.arrow.down",
-                                    title: "Agent Inbox",
-                                    subtitle: "Reveal in Finder"
-                                ) {
-                                    NSWorkspace.shared.activateFileViewerSelecting([inbox.inboxDirectory])
-                                }
+                                // Sandboxing means the user has to pick it, so
+                                // the app is granted access to that location.
+                                if let inboxURL = inbox.inboxDirectory {
+                                    SettingsButton(
+                                        icon: "tray.and.arrow.down",
+                                        title: "Agent Inbox",
+                                        subtitle: inboxURL.path
+                                    ) {
+                                        NSWorkspace.shared.activateFileViewerSelecting([inboxURL])
+                                    }
 
-                                SettingsButton(
-                                    icon: didCopyInboxPath ? "checkmark" : "doc.on.doc",
-                                    title: "Copy Inbox Path",
-                                    subtitle: didCopyInboxPath ? "Copied" : inbox.inboxDirectory.path
-                                ) {
-                                    copyInboxPath()
+                                    SettingsButton(
+                                        icon: didCopyInboxPath ? "checkmark" : "doc.on.doc",
+                                        title: "Copy Inbox Path",
+                                        subtitle: didCopyInboxPath ? "Copied" : "For handing to an agent"
+                                    ) {
+                                        copyInboxPath(inboxURL)
+                                    }
+
+                                    SettingsButton(
+                                        icon: "folder.badge.gearshape",
+                                        title: "Change Inbox Folder",
+                                        subtitle: "Pick a different location"
+                                    ) {
+                                        inbox.chooseFolder()
+                                    }
+                                } else {
+                                    SettingsButton(
+                                        icon: "tray.and.arrow.down",
+                                        title: "Set Up Agent Inbox",
+                                        subtitle: "Choose a drop folder…"
+                                    ) {
+                                        inbox.chooseFolder()
+                                    }
                                 }
                             }
                         }
@@ -272,9 +292,9 @@ struct SettingsPanelView: View {
     }
     
     /// Puts the inbox path on the clipboard so it can be handed to an agent.
-    private func copyInboxPath() {
+    private func copyInboxPath(_ url: URL) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(inbox.inboxDirectory.path, forType: .string)
+        NSPasteboard.general.setString(url.path, forType: .string)
         withAnimation { didCopyInboxPath = true }
         Task {
             try? await Task.sleep(nanoseconds: 1_500_000_000)

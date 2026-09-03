@@ -5,6 +5,7 @@
 
 import SwiftUI
 import CoreText
+import AppKit
 
 @main
 struct NyaVizApp: App {
@@ -72,6 +73,22 @@ struct NyaVizApp: App {
                     audioPlayer.showSRTPicker = true
                 }
                 .keyboardShortcut("L", modifiers: .command)
+
+                Divider()
+
+                // One-time setup, so it belongs somewhere findable rather than
+                // behind a hover-revealed button in the settings panel.
+                Button(inboxWatcher.isConfigured ? "Change Agent Inbox Folder..." : "Set Up Agent Inbox...") {
+                    inboxWatcher.chooseFolder()
+                }
+
+                if inboxWatcher.isConfigured {
+                    Button("Reveal Agent Inbox in Finder") {
+                        if let url = inboxWatcher.inboxDirectory {
+                            NSWorkspace.shared.activateFileViewerSelecting([url])
+                        }
+                    }
+                }
             }
         }
     }

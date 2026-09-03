@@ -410,9 +410,22 @@ Library/
 NyaViz watches a drop-folder so that scripts and AI agents can add tracks and
 lyrics by writing files, without driving the UI.
 
+### Choosing the folder
+
+The folder is picked by the user, not fixed by the app. NyaViz is sandboxed, and
+macOS blocks other processes from reading or writing an app's container — a
+folder inside it would be unreachable to the very tools this feature exists for.
+
+Choose it via **File → Set Up Agent Inbox…**, or **Settings → Files → Set Up
+Agent Inbox**. Any ordinary location works (`~/Music/NyaViz Inbox`, say). The
+choice is stored as a security-scoped bookmark, so access survives relaunches
+without asking again. **File → Change Agent Inbox Folder…** moves it.
+
+Once set, the folder looks like this:
+
 ```
-<Application Support>/NyaViz/Inbox/
-├── README.md          # the contract, written on first launch
+<chosen folder>/
+├── README.md          # the contract, written when the folder is chosen
 ├── status.json        # append-only log of import results
 ├── .processed/        # successfully imported drops are moved here
 └── My Song/           # a drop
@@ -421,9 +434,8 @@ lyrics by writing files, without driving the UI.
     └── backdrop.jpg
 ```
 
-The exact path depends on whether the app is sandboxed, so it is resolved at
-runtime. **Settings → Files → Copy Inbox Path** puts the live path on the
-clipboard, and **Agent Inbox** reveals the folder in Finder.
+**Settings → Files → Copy Inbox Path** puts the current path on the clipboard for
+handing to an agent, and **Agent Inbox** reveals the folder in Finder.
 
 ### Adding a track
 
@@ -475,6 +487,10 @@ explaining why. The last 50 results are retained.
 - Skipped and failed drops stay in the inbox so they can be corrected. Each is
   reported once; editing the file makes it retry.
 - A background import never changes which track is marked as currently playing.
+- The security-scoped bookmark requires `com.apple.security.files.bookmarks.app-scope`.
+  The project ships entitlements from `NyaViz/NyaViz.entitlements` via
+  `CODE_SIGN_ENTITLEMENTS`; before this feature that file was not referenced by
+  the project and the key was never actually granted.
 
 ## Video Export
 
