@@ -5,14 +5,17 @@
 
 import SwiftUI
 
-/// A single, window-size-derived scale factor shared by every chrome element in
-/// full-screen lyrics mode (track info card, floating controls, lyric text).
+/// A single, window-size-derived scale factor shared by the chrome of
+/// full-screen lyrics mode: the track info card, the track list and the
+/// floating controls.
 ///
 /// Historically each element derived its own scale — the track info card used
-/// `min(w, h) / 800` clamped to `0.6...1.5` while the floating controls and the
-/// lyric text did not scale at all.  The result was a composition that changed
-/// shape at every window size.  `UIScale` replaces those with one value so the
-/// whole layout grows and shrinks together.
+/// `min(w, h) / 800` clamped to `0.6...1.5` while the floating controls did not
+/// scale at all — so the chrome changed shape at every window size.
+///
+/// Lyric text is deliberately **not** scaled by this.  Its size is the user's
+/// `lyricFontSize` setting and nothing else, so moving the window or entering
+/// full screen never changes how large the lyrics read.
 enum UIScale {
 
     /// The reference frame at which the scale is exactly `1.0`.
@@ -26,18 +29,26 @@ enum UIScale {
     /// Never shrink below the reference sizes.
     static let minimum: CGFloat = 1.0
 
-    /// Keep very large displays (5K and up) from rendering absurdly large text.
-    static let maximum: CGFloat = 2.0
+    /// Ceiling for very large displays.
+    static let maximum: CGFloat = 1.3
+
+    /// How much of the frame's growth the chrome takes on.
+    ///
+    /// Scaling chrome in step with the frame (a rate of `1.0`) makes it loom on a
+    /// full-screen display: controls meant to sit quietly at the edge become the
+    /// loudest thing on screen.  Growing at roughly a third of that rate keeps
+    /// them legible on a large display without turning them into furniture.
+    static let growthRate: CGFloat = 0.35
 
     /// Computes the scale factor for a given frame.
     ///
-    /// The width and height ratios are combined with `min` so that a wide-but-short
-    /// window scales by its height — otherwise long lyric lines would overflow the
-    /// top and bottom of the frame.
+    /// The width and height ratios are combined with `min` so a wide-but-short
+    /// window scales by its height rather than overflowing top and bottom.
     static func factor(for size: CGSize) -> CGFloat {
         guard size.width > 0, size.height > 0 else { return minimum }
         let ratio = min(size.width / referenceWidth, size.height / referenceHeight)
-        return min(max(ratio, minimum), maximum)
+        let damped = 1.0 + (ratio - 1.0) * growthRate
+        return min(max(damped, minimum), maximum)
     }
 }
 

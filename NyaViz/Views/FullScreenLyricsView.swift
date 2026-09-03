@@ -29,7 +29,7 @@ struct FullScreenLyricsView: View {
                     .animation(.easeInOut(duration: 0.8), value: settings.lyricLinesVisible)
                 } else {
                     Image(systemName: "text.quote")
-                        .font(.system(size: 64 * scale, weight: .ultraLight))
+                        .font(.system(size: 64, weight: .ultraLight))
                         .foregroundColor(Color.white.opacity(0.1))
                 }
 
@@ -168,18 +168,17 @@ struct FullScreenTrackInfoView: View {
 struct FullScreenOneLineLyric: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
-    @Environment(\.uiScale) private var scale
 
     var body: some View {
         VStack {
             Spacer()
             
             if let lyric = audioPlayer.oneLineModeLyric {
-                VStack(spacing: 10 * scale) {
+                VStack(spacing: 10) {
                     // Main lyric (top, bold, all caps) - with styled text support
                     if lyric.hasStyles {
                         lyric.styledMainText.attributedText(
-                            font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.3 * scale),
+                            font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.3),
                             brightness: settings.colorBrightness,
                             uppercased: true
                         )
@@ -189,7 +188,7 @@ struct FullScreenOneLineLyric: View {
                         .minimumScaleFactor(0.5)
                     } else {
                         Text(lyric.mainText.uppercased())
-                            .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.3 * scale))
+                            .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.3))
                             .fontWeight(.bold)
                             .foregroundColor(.white)
                             .multilineTextAlignment(.center)
@@ -201,7 +200,7 @@ struct FullScreenOneLineLyric: View {
                     if let styledBackground = lyric.styledBackgroundText {
                         if styledBackground.hasStyles {
                             styledBackground.attributedText(
-                                font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.85 * scale),
+                                font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.85),
                                 opacity: 0.5,
                                 brightness: settings.colorBrightness,
                                 uppercased: true
@@ -212,7 +211,7 @@ struct FullScreenOneLineLyric: View {
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
                         } else {
                             Text(styledBackground.plainText.uppercased())
-                                .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.85 * scale))
+                                .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.85))
                                 .foregroundColor(.white.opacity(0.5))
                                 .multilineTextAlignment(.center)
                                 .lineLimit(1)
@@ -221,7 +220,7 @@ struct FullScreenOneLineLyric: View {
                         }
                     }
                 }
-                .padding(.horizontal, 60 * scale)
+                .padding(.horizontal, 60)
                 .id(lyric.displayId)
                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
@@ -238,14 +237,13 @@ struct FullScreenOneLineLyric: View {
 struct FullScreenSmoothLyrics: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
-    @Environment(\.uiScale) private var scale
 
     let containerHeight: CGFloat
 
-    private var lineSpacing: CGFloat { 24 * scale }
+    private let lineSpacing: CGFloat = 24
 
     private var fontSize: CGFloat {
-        settings.lyricFontSize * 1.2 * scale
+        settings.lyricFontSize * 1.2
     }
     
     private var lineHeight: CGFloat {
@@ -285,7 +283,7 @@ struct FullScreenSmoothLyrics: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
-        .padding(.horizontal, 60 * scale)
+        .padding(.horizontal, 60)
         .onChange(of: audioPlayer.currentLyricIndex) { _, newValue in
             withAnimation(.easeOut(duration: 0.3)) {
                 smoothIndex = CGFloat(newValue)
@@ -426,11 +424,11 @@ struct FloatingControlsView: View {
             }
             
             // Main controls
-            HStack(spacing: 20 * scale) {
+            HStack(spacing: 18 * scale) {
                 // Loop
                 Button(action: { audioPlayer.toggleLoop() }) {
                     Image(systemName: audioPlayer.isLooping ? "repeat.1" : "repeat")
-                        .font(.system(size: 14 * scale))
+                        .font(.system(size: 12 * scale))
                         .foregroundColor(audioPlayer.isLooping ? .white : .white.opacity(0.5))
                 }
                 .buttonStyle(.plain)
@@ -439,7 +437,7 @@ struct FloatingControlsView: View {
                 // Previous song
                 Button(action: { audioPlayer.playPreviousSong() }) {
                     Image(systemName: "backward.fill")
-                        .font(.system(size: 14 * scale))
+                        .font(.system(size: 12 * scale))
                         .foregroundColor(.white.opacity(0.5))
                 }
                 .buttonStyle(.plain)
@@ -450,10 +448,10 @@ struct FloatingControlsView: View {
                     ZStack {
                         Circle()
                             .fill(.white)
-                            .frame(width: 44 * scale, height: 44 * scale)
+                            .frame(width: 36 * scale, height: 36 * scale)
 
                         Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 16 * scale))
+                            .font(.system(size: 13 * scale))
                             .foregroundColor(.black)
                             .offset(x: audioPlayer.isPlaying ? 0 : 2)
                     }
@@ -464,7 +462,7 @@ struct FloatingControlsView: View {
                 // Next song
                 Button(action: { audioPlayer.playNextSong() }) {
                     Image(systemName: "forward.fill")
-                        .font(.system(size: 14 * scale))
+                        .font(.system(size: 12 * scale))
                         .foregroundColor(.white.opacity(0.5))
                 }
                 .buttonStyle(.plain)
@@ -473,12 +471,12 @@ struct FloatingControlsView: View {
                 // Divider
                 Rectangle()
                     .fill(Color.white.opacity(0.2))
-                    .frame(width: 1, height: 20 * scale)
+                    .frame(width: 1, height: 16 * scale)
 
                 // Export video button
                 Button(action: { startExport() }) {
                     Image(systemName: videoExporter.isExporting ? "arrow.clockwise" : "square.and.arrow.up")
-                        .font(.system(size: 14 * scale))
+                        .font(.system(size: 12 * scale))
                         .foregroundColor(videoExporter.isExporting ? .white.opacity(0.3) : .white.opacity(0.5))
                         .rotationEffect(.degrees(videoExporter.isExporting ? 360 : 0))
                         .animation(videoExporter.isExporting ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: videoExporter.isExporting)
@@ -490,14 +488,14 @@ struct FloatingControlsView: View {
                 // Exit fullscreen
                 Button(action: { settings.isFullScreen = false }) {
                     Image(systemName: "arrow.down.right.and.arrow.up.left")
-                        .font(.system(size: 14 * scale))
+                        .font(.system(size: 12 * scale))
                         .foregroundColor(.white.opacity(0.5))
                 }
                 .buttonStyle(.plain)
                 .disabled(videoExporter.isExporting)
             }
-            .padding(.horizontal, 24 * scale)
-            .padding(.vertical, 12 * scale)
+            .padding(.horizontal, 20 * scale)
+            .padding(.vertical, 10 * scale)
         }
         .alert(exportSuccess ? "Export Complete" : "Export Failed", isPresented: $showExportAlert) {
             Button("OK") { }

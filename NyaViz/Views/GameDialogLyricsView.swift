@@ -10,8 +10,6 @@ import SwiftUI
 struct GameDialogLyricsView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
-    /// 1.0 outside full-screen mode, so the windowed layout is unaffected.
-    @Environment(\.uiScale) private var scale
     
     // Use oneLineModeLyric to respect SRT end times (like minimal mode)
     private var currentMergedLyric: AudioPlayerManager.MergedLyric? {
@@ -32,11 +30,11 @@ struct GameDialogLyricsView: View {
     
     var body: some View {
         GeometryReader { geo in
-            let fontSize = settings.lyricFontSize * 0.85 * scale
+            let fontSize = settings.lyricFontSize * 0.85
             let dialogMaxWidth = geo.size.width * settings.dialogMaxWidth
             let dialogMaxHeight = geo.size.height * settings.dialogMaxHeight
             let horizontalMargin = (geo.size.width - dialogMaxWidth) / 2
-            let nameTagFontSize = max(11 * scale, min(14 * scale, geo.size.width * 0.012))
+            let nameTagFontSize = max(11, min(14, geo.size.width * 0.012))
             
             // Position calculation: dialogPosition is 0.5-0.9 where higher = lower on screen
             let topSpacerHeight = geo.size.height * settings.dialogPosition - (dialogMaxHeight / 2)
@@ -55,10 +53,10 @@ struct GameDialogLyricsView: View {
                         HStack {
                             Text(displayName.uppercased())
                                 .font(.custom("MollenTrial-Bold", size: nameTagFontSize))
-                                .tracking(2 * scale)
+                                .tracking(2)
                                 .foregroundColor(.white.opacity(0.95))
-                                .padding(.horizontal, 14 * scale)
-                                .padding(.vertical, 6 * scale)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
                                 .background(
                                     Rectangle()
                                         .fill(Color.white.opacity(0.12))
@@ -110,8 +108,8 @@ struct GameDialogLyricsView: View {
                                     .frame(maxWidth: .infinity)
                             }
                         }
-                        .padding(.horizontal, 32 * scale)
-                        .padding(.vertical, 20 * scale)
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 20)
                         .frame(maxWidth: dialogMaxWidth, maxHeight: dialogMaxHeight)
                         .background(
                             // Dialog box background with wide border
