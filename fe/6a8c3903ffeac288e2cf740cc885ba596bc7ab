@@ -1,0 +1,30 @@
+NyaViz/Views/SettingsPanelView.swift
+  s_d3bf91d61bc236::t_20d0c57a48ca5d 79-88,90-112,295,297
+NyaViz.xcodeproj/project.pbxproj
+  s_d3bf91d61bc236::t_3a1c983a29cf79 397,430
+NyaViz/NyaVizApp.swift
+  s_d3bf91d61bc236::t_662acacf521627 8,76-91
+NYAVIZ.md
+  s_d3bf91d61bc236::t_565faf5a76a7ca 413-425,427-428,437-438,490-493
+NyaViz/Managers/InboxWatcher.swift
+  s_d3bf91d61bc236::t_679f72a772b3ed 582-586
+  s_d3bf91d61bc236::t_3ab522279ecd6e 219,221,225-227,231-235,237,270,275,308,469-470,472,481,489,496,498,509
+  s_d3bf91d61bc236::t_c65ce985290792 117-118,122,130,137-214
+  s_d3bf91d61bc236::t_123fbaaa948332 6,18-24,26-27,79,81-89,92-99,102-103,106-107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "fe6a8c3903ffeac288e2cf740cc885ba596bc7ab",
+  "prompts": {},
+  "sessions": {
+    "s_d3bf91d61bc236": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c0949135-be90-4cf1-a588-709cb819b8c9",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
