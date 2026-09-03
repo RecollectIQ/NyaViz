@@ -1,0 +1,25 @@
+NyaVizTests/LibraryRenameTests.swift
+  s_d3bf91d61bc236::t_a9ae6e69a8747f 1-100
+NyaViz/Views/FullScreenLyricsView.swift
+  s_d3bf91d61bc236::t_869b5ad1b3f5e4 65-69,73,79-93,122-144,191,199-223
+NyaViz/Managers/LibraryManager.swift
+  s_d3bf91d61bc236::t_cefd59ab9b91c8 123-128,313-338
+NyaViz/Views/MainPlayerView.swift
+  s_d3bf91d61bc236::t_8f8669d08b7215 11-17,47,101,103-107,118,615
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0d1e44a73a0d0d0bcf79779ab673b2e2b5446108",
+  "prompts": {},
+  "sessions": {
+    "s_d3bf91d61bc236": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c0949135-be90-4cf1-a588-709cb819b8c9",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
