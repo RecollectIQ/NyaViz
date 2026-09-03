@@ -5,51 +5,52 @@
 
 import SwiftUI
 
-/// The track picker that drops down beneath the track-info card in full-screen
+/// The track picker that appears beneath the track-info card in full-screen
 /// lyrics mode.
 ///
-/// Full-screen mode deliberately hides the windowed library sidebar, so this is
-/// the only way to change tracks without leaving full screen.  It lists the same
-/// entries in the same order the playlist advances through
-/// (``AudioPlayerManager/playNextSong()`` sorts by `lastPlayed` descending).
+/// Deliberately not a panel: no surface, border or shadow of its own.  It reads
+/// as a continuation of the track title — plain lines of text sharing the same
+/// background and the same left edge — so expanding it does not drop a piece of
+/// window chrome over the artwork.
+///
+/// Full-screen mode hides the windowed library sidebar, so this is the only way
+/// to change tracks without leaving full screen.  It lists entries in the order
+/// the playlist advances through them (``AudioPlayerManager/playNextSong()``
+/// sorts by `lastPlayed` descending).
 struct FullScreenTrackListView: View {
 
     @EnvironmentObject var library: LibraryManager
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @Environment(\.uiScale) private var scale
 
-    /// Called after a track is chosen so the caller can collapse the panel.
+    /// Called after a track is chosen so the caller can collapse the list.
     let onSelect: () -> Void
 
     private var sortedEntries: [LibraryEntry] {
         library.entries.sorted { $0.lastPlayed > $1.lastPlayed }
     }
 
-    private var rowHeight: CGFloat { 32 * scale }
-    private var listPadding: CGFloat { 12 * scale }
+    private var rowHeight: CGFloat { 26 * scale }
 
     /// A `ScrollView` takes all the height it is offered, so a short library
-    /// would otherwise render as a mostly-empty panel.  Rows are a fixed height,
-    /// so the content height is exact rather than estimated.
+    /// would otherwise leave a large empty gap.  Rows are a fixed height, so the
+    /// content height is exact rather than estimated.
     private var listHeight: CGFloat {
-        let content = CGFloat(sortedEntries.count) * rowHeight + listPadding
-        return min(content, 320 * scale)
+        min(CGFloat(sortedEntries.count) * rowHeight, 320 * scale)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        Group {
             if sortedEntries.isEmpty {
                 Text("No songs in library")
                     .font(.system(size: 12 * scale))
-                    .foregroundColor(.white.opacity(0.35))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 14 * scale)
-                    .padding(.vertical, 14 * scale)
+                    .foregroundColor(.white.opacity(0.3))
+                    .frame(height: rowHeight, alignment: .leading)
             } else {
                 ScrollView(.vertical, showsIndicators: false) {
-                    LazyVStack(spacing: 0) {
+                    LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(sortedEntries) { entry in
-                            FullScreenTrackRow(entry: entry)
+                            FullScreenTrackRow(entry: entry, height: rowHeight)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
                                     audioPlayer.loadLibraryEntry(entry)
@@ -57,27 +58,12 @@ struct FullScreenTrackListView: View {
                                 }
                         }
                     }
-                    .padding(.vertical, listPadding / 2)
                 }
                 .frame(height: listHeight)
             }
         }
-        .frame(width: 300 * scale)
-        .background(
-            RoundedRectangle(cornerRadius: 12 * scale)
-                .fill(.ultraThinMaterial)
-                .environment(\.colorScheme, .dark)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12 * scale)
-                        .fill(Color.black.opacity(0.35))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12 * scale)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12 * scale))
-        .shadow(color: .black.opacity(0.5), radius: 18 * scale, y: 8 * scale)
+        // Long titles truncate rather than running across the lyrics.
+        .frame(maxWidth: 340 * scale, alignment: .leading)
     }
 }
 
@@ -86,6 +72,7 @@ struct FullScreenTrackListView: View {
 private struct FullScreenTrackRow: View {
 
     let entry: LibraryEntry
+    let height: CGFloat
 
     @EnvironmentObject var library: LibraryManager
     @Environment(\.uiScale) private var scale
@@ -95,44 +82,34 @@ private struct FullScreenTrackRow: View {
         library.currentEntryId == entry.id
     }
 
-    var body: some View {
-        HStack(spacing: 8 * scale) {
-            Circle()
-                .fill(Color.white.opacity(isCurrentEntry ? 0.9 : 0))
-                .frame(width: 5 * scale, height: 5 * scale)
+    /// The playing track reads at full strength, the rest recede; hovering lifts
+    /// a row part-way.  Brightness carries the state instead of a filled row.
+    private var titleOpacity: Double {
+        if isCurrentEntry { return 0.95 }
+        return isHovered ? 0.85 : 0.45
+    }
 
+    var body: some View {
+        HStack(spacing: 6 * scale) {
             Text(entry.title)
-                .font(.system(size: 12 * scale, weight: isCurrentEntry ? .semibold : .medium))
-                .foregroundColor(.white.opacity(isCurrentEntry ? 1.0 : 0.75))
+                .font(.system(size: 13 * scale, weight: isCurrentEntry ? .semibold : .regular))
+                .foregroundColor(.white.opacity(titleOpacity))
                 .lineLimit(1)
                 .truncationMode(.tail)
 
             if entry.lyricsFile != nil {
                 Image(systemName: "text.quote")
                     .font(.system(size: 9 * scale))
-                    .foregroundColor(.white.opacity(0.35))
+                    .foregroundColor(.white.opacity(titleOpacity * 0.5))
             }
 
-            Spacer(minLength: 4 * scale)
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 14 * scale)
-        .frame(height: 32 * scale)  // keep in sync with FullScreenTrackListView.rowHeight
-        .background(rowBackground)
+        .frame(height: height)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
             }
-        }
-    }
-
-    @ViewBuilder
-    private var rowBackground: some View {
-        if isCurrentEntry {
-            Color.white.opacity(0.10)
-        } else if isHovered {
-            Color.white.opacity(0.06)
-        } else {
-            Color.clear
         }
     }
 }

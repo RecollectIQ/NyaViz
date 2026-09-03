@@ -71,7 +71,7 @@ struct FullScreenTrackInfoView: View {
     @State private var isExpanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8 * scale) {
+        VStack(alignment: .leading, spacing: 10 * scale) {
             HStack(alignment: .center, spacing: 12 * scale) {
                 // Progress ring (tap to play/pause)
                 ZStack {
@@ -124,10 +124,13 @@ struct FullScreenTrackInfoView: View {
                 Spacer(minLength: 0)
             }
 
-            // Track picker dropdown, anchored under the card
+            // Track list, reading as a continuation of the title above it.
+            // Indented past the progress ring so its left edge lines up with
+            // the track title rather than the ring.
             if isExpanded {
                 FullScreenTrackListView { isExpanded = false }
-                    .transition(.opacity.combined(with: .offset(y: -8)))
+                    .padding(.leading, 44 * scale)
+                    .transition(.opacity.combined(with: .offset(y: -6)))
             }
         }
         .padding(.horizontal, 24 * scale)
