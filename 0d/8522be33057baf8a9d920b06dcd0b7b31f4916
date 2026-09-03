@@ -1,0 +1,21 @@
+NyaViz/Views/FullScreenTrackListView.swift
+  s_d3bf91d61bc236::t_4d4b6d5bc6213b 8,11-19,26,33,36-37,39,43,47-48,51,53,65-66,75,85-90,92-93,95-96,103,106,108
+NyaViz/Views/FullScreenLyricsView.swift
+  s_d3bf91d61bc236::t_28dc38557839be 74,127-129,132-133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0d8522be33057baf8a9d920b06dcd0b7b31f4916",
+  "prompts": {},
+  "sessions": {
+    "s_d3bf91d61bc236": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c0949135-be90-4cf1-a588-709cb819b8c9",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
