@@ -120,6 +120,12 @@ class LibraryManager: ObservableObject {
 
     // MARK: - Lookup
 
+    /// The entry that is currently loaded, if any.
+    var currentEntry: LibraryEntry? {
+        guard let id = currentEntryId else { return nil }
+        return entries.first { $0.id == id }
+    }
+
     /// Returns the first entry whose ``LibraryEntry/originalAudioName`` matches
     /// the given filename (case-insensitive).
     func findEntry(byAudioName name: String) -> LibraryEntry? {
@@ -302,6 +308,34 @@ class LibraryManager: ObservableObject {
         for item in contents where !preserved.contains(item.lastPathComponent) {
             try? fm.removeItem(at: item)
         }
+    }
+
+    // MARK: - Rename
+
+    /// Renames an entry's display title and persists it.
+    ///
+    /// Only the title changes: the audio and lyrics filenames on disk, and the
+    /// ``LibraryEntry/originalAudioName`` used for de-duplication, are untouched,
+    /// so re-opening the same audio file still resolves to this entry rather than
+    /// creating a second one.
+    ///
+    /// - Parameters:
+    ///   - id: The entry to rename.
+    ///   - title: The new title. Surrounding whitespace is trimmed; an empty or
+    ///     whitespace-only title is rejected so an entry can never become nameless.
+    /// - Returns: `true` if the entry existed and the title was written.
+    @discardableResult
+    func renameEntry(id: String, to title: String) -> Bool {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let idx = entries.firstIndex(where: { $0.id == id }) else { return false }
+
+        var entry = entries[idx]
+        guard entry.title != trimmed else { return true }
+        entry.title = trimmed
+        saveIndex(for: entry)
+        entries[idx] = entry
+        return true
     }
 
     // MARK: - Remove Entry
