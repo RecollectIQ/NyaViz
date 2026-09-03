@@ -11,6 +11,7 @@ struct NyaVizApp: App {
     @StateObject private var audioPlayer = AudioPlayerManager()
     @StateObject private var settingsManager = SettingsManager()
     @StateObject private var libraryManager = LibraryManager()
+    @StateObject private var inboxWatcher = InboxWatcher()
 
     init() {
         // Register custom fonts
@@ -46,6 +47,7 @@ struct NyaVizApp: App {
                 .environmentObject(audioPlayer)
                 .environmentObject(settingsManager)
                 .environmentObject(libraryManager)
+                .environmentObject(inboxWatcher)
                 .frame(minWidth: 900, minHeight: 600)
                 .task {
                     // Wire the settings and library references so AudioPlayerManager can apply
@@ -53,6 +55,9 @@ struct NyaVizApp: App {
                     // after the first render.
                     audioPlayer.settingsRef = settingsManager
                     audioPlayer.libraryRef = libraryManager
+
+                    // Begin importing anything agents write into the inbox folder.
+                    inboxWatcher.start(library: libraryManager, audioPlayer: audioPlayer)
                 }
         }
         .windowStyle(.hiddenTitleBar)

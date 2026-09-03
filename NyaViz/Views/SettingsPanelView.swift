@@ -10,6 +10,9 @@ import AppKit
 struct SettingsPanelView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
+    @EnvironmentObject var inbox: InboxWatcher
+
+    @State private var didCopyInboxPath = false
     
     private var linesLabel: String {
         switch settings.lyricLinesVisible {
@@ -70,6 +73,23 @@ struct SettingsPanelView: View {
                                     subtitle: audioPlayer.hasLyrics ? "\(audioPlayer.lyrics.count) lines" : "No file"
                                 ) {
                                     openSRTFile()
+                                }
+
+                                // The drop folder agents and scripts write into.
+                                SettingsButton(
+                                    icon: "tray.and.arrow.down",
+                                    title: "Agent Inbox",
+                                    subtitle: "Reveal in Finder"
+                                ) {
+                                    NSWorkspace.shared.activateFileViewerSelecting([inbox.inboxDirectory])
+                                }
+
+                                SettingsButton(
+                                    icon: didCopyInboxPath ? "checkmark" : "doc.on.doc",
+                                    title: "Copy Inbox Path",
+                                    subtitle: didCopyInboxPath ? "Copied" : inbox.inboxDirectory.path
+                                ) {
+                                    copyInboxPath()
                                 }
                             }
                         }
@@ -251,6 +271,17 @@ struct SettingsPanelView: View {
         }
     }
     
+    /// Puts the inbox path on the clipboard so it can be handed to an agent.
+    private func copyInboxPath() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(inbox.inboxDirectory.path, forType: .string)
+        withAnimation { didCopyInboxPath = true }
+        Task {
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            withAnimation { didCopyInboxPath = false }
+        }
+    }
+
     private func openSRTFile() {
         let panel = NSOpenPanel()
         // Support both .srt and .nyaviz formats

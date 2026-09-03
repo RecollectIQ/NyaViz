@@ -17,6 +17,19 @@ struct ContentView: View {
     @State private var showLibraryButton = false
 
     var body: some View {
+        GeometryReader { geo in
+            // One scale factor for the whole full-screen presentation — the track
+            // info card, the floating controls and the lyric text all read it from
+            // the environment so they grow together.  Outside full-screen mode it
+            // stays at 1.0, leaving the windowed layout exactly as it was.
+            let scale = settings.isFullScreen ? UIScale.factor(for: geo.size) : 1.0
+
+            content(scale: scale)
+                .environment(\.uiScale, scale)
+        }
+    }
+
+    private func content(scale: CGFloat) -> some View {
         ZStack {
             // Background Layer
             BackgroundView()
@@ -38,7 +51,7 @@ struct ContentView: View {
                         .opacity(showControls ? 1 : 0)
                         .animation(.easeInOut(duration: 0.3), value: showControls)
                 }
-                .padding(.bottom, 40)
+                .padding(.bottom, 40 * scale)
             }
 
             // Library Button (top left) - not in fullscreen

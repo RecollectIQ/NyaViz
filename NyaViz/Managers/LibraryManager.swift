@@ -154,17 +154,22 @@ class LibraryManager: ObservableObject {
     /// Otherwise a new entry folder is created, the audio file is copied into
     /// it, and the entry is persisted and prepended to ``entries``.
     ///
-    /// - Parameter sourceURL: The URL of the audio file to import.
+    /// - Parameters:
+    ///   - sourceURL: The URL of the audio file to import.
+    ///   - setCurrent: Whether the imported entry becomes ``currentEntryId``.
+    ///     Pass `false` for background imports (e.g. the agent inbox) so that a
+    ///     song arriving on disk does not steal the "now playing" marker from
+    ///     the track the user is actually listening to.
     /// - Returns: A tuple of the (possibly existing) ``LibraryEntry`` and its
     ///   folder URL, or `nil` if the copy failed.
     @discardableResult
-    func importAudio(from sourceURL: URL) -> (entry: LibraryEntry, folder: URL)? {
+    func importAudio(from sourceURL: URL, setCurrent: Bool = true) -> (entry: LibraryEntry, folder: URL)? {
         let audioName = sourceURL.lastPathComponent
 
         // Re-use an existing entry for the same audio file.
         if let existing = findEntry(byAudioName: audioName) {
             let folder = entryDirectory(for: existing)
-            currentEntryId = existing.id
+            if setCurrent { currentEntryId = existing.id }
             return (existing, folder)
         }
 
@@ -183,7 +188,7 @@ class LibraryManager: ObservableObject {
         }
 
         let title = sourceURL.deletingPathExtension().lastPathComponent
-        var entry = LibraryEntry(
+        let entry = LibraryEntry(
             id: id,
             title: title,
             audioFile: audioName,
@@ -196,7 +201,7 @@ class LibraryManager: ObservableObject {
 
         // Keep entries sorted newest-first.
         entries.insert(entry, at: 0)
-        currentEntryId = entry.id
+        if setCurrent { currentEntryId = entry.id }
         return (entry, folder)
     }
 
@@ -217,8 +222,30 @@ class LibraryManager: ObservableObject {
         directiveImagePaths: [String],
         imageSourceDir: URL?
     ) {
-        guard let entryId = currentEntryId,
-              let idx = entries.firstIndex(where: { $0.id == entryId }) else { return }
+        guard let entryId = currentEntryId else { return }
+        importLyrics(
+            from: sourceURL,
+            into: entryId,
+            directiveImagePaths: directiveImagePaths,
+            imageSourceDir: imageSourceDir
+        )
+    }
+
+    /// Replaces the lyrics file for a specific entry.
+    ///
+    /// Behaves exactly like ``importLyrics(from:directiveImagePaths:imageSourceDir:)``
+    /// but targets an explicit entry instead of the current one, so a background
+    /// import can attach lyrics to a track other than the one playing.
+    ///
+    /// - Returns: `true` if the entry existed and the lyrics were written.
+    @discardableResult
+    func importLyrics(
+        from sourceURL: URL,
+        into entryId: String,
+        directiveImagePaths: [String],
+        imageSourceDir: URL?
+    ) -> Bool {
+        guard let idx = entries.firstIndex(where: { $0.id == entryId }) else { return false }
 
         var entry = entries[idx]
         let folder = entryDirectory(for: entry)
@@ -249,6 +276,7 @@ class LibraryManager: ObservableObject {
         entry.lyricsFile = lyricsName
         saveIndex(for: entry)
         entries[idx] = entry
+        return true
     }
 
     // MARK: - Cleanup

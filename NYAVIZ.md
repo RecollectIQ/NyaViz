@@ -405,6 +405,77 @@ Library/
 - **Self-contained**: All files (audio, lyrics, directive images) are copied into the library folder
 - **Playlist playback**: When loop-one is off, the next song in the library plays automatically
 
+## Agent Inbox
+
+NyaViz watches a drop-folder so that scripts and AI agents can add tracks and
+lyrics by writing files, without driving the UI.
+
+```
+<Application Support>/NyaViz/Inbox/
+├── README.md          # the contract, written on first launch
+├── status.json        # append-only log of import results
+├── .processed/        # successfully imported drops are moved here
+└── My Song/           # a drop
+    ├── my-song.mp3
+    ├── my-song.nyaviz
+    └── backdrop.jpg
+```
+
+The exact path depends on whether the app is sandboxed, so it is resolved at
+runtime. **Settings → Files → Copy Inbox Path** puts the live path on the
+clipboard, and **Agent Inbox** reveals the folder in Finder.
+
+### Adding a track
+
+Create a sub-folder containing the audio file, and optionally a lyrics file and
+any background images its directives reference. Filenames do not matter — files
+are identified by extension:
+
+- Audio: `.mp3` `.m4a` `.wav` `.aiff` `.aif` `.caf` `.flac` `.aac` `.alac` `.mp4`
+- Lyrics: `.nyaviz` `.srt`
+
+A single loose file dropped directly into the inbox works the same way.
+
+### Adding lyrics to an existing track
+
+Drop only the lyrics file. It is matched to a library entry by filename stem, so
+`Killings.nyaviz` attaches to the track titled `Killings`. If that track is
+playing at the time, the new lyrics load immediately. When no track matches, the
+file stays in the inbox and the reason is recorded in `status.json`.
+
+### Confirming the import
+
+Every attempt is appended to `status.json`, so a writer can verify the outcome:
+
+```json
+{
+  "updated": "2026-09-03T12:00:00Z",
+  "results": [
+    {
+      "time": "2026-09-03T12:00:00Z",
+      "source": "My Song",
+      "status": "imported",
+      "trackId": "a1b2c3d4",
+      "title": "my-song",
+      "lyricsAttached": true
+    }
+  ]
+}
+```
+
+`status` is `imported`, `skipped` or `failed`; the latter two carry a `message`
+explaining why. The last 50 results are retained.
+
+### Behaviour notes
+
+- A drop is imported only once nothing inside it has changed for 2 seconds, so a
+  partially written file is never picked up.
+- Imported drops are **moved** to `.processed/` rather than deleted. The library
+  holds its own copy, so `.processed/` can be emptied at any time.
+- Skipped and failed drops stay in the inbox so they can be corrected. Each is
+  reported once; editing the file makes it retry.
+- A background import never changes which track is marked as currently playing.
+
 ## Video Export
 
 NyaViz can export the lyrics visualization as an MP4 video. The export renders:
@@ -421,5 +492,5 @@ All UI elements scale proportionally with the chosen resolution (480p, 720p, 108
 
 ---
 
-*NyaViz Format Specification v1.2*
+*NyaViz Format Specification v1.3*
 

@@ -9,7 +9,8 @@ struct FullScreenLyricsView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
     @EnvironmentObject var library: LibraryManager
-    
+    @Environment(\.uiScale) private var scale
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
@@ -28,74 +29,130 @@ struct FullScreenLyricsView: View {
                     .animation(.easeInOut(duration: 0.8), value: settings.lyricLinesVisible)
                 } else {
                     Image(systemName: "text.quote")
-                        .font(.system(size: 64, weight: .ultraLight))
+                        .font(.system(size: 64 * scale, weight: .ultraLight))
                         .foregroundColor(Color.white.opacity(0.1))
                 }
-                
-                // Track info at top left (if enabled) - scales with window size
+
+                // Track info card and track picker at top left (if enabled).
+                // All sizing comes from the shared `uiScale` — see `UIScale`.
                 if settings.showTrackTitle && !audioPlayer.audioFileName.isEmpty {
-                    let scaleFactor = min(geo.size.width, geo.size.height) / 800
-                    let clampedScale = min(max(scaleFactor, 0.6), 1.5)
-                    let ringSize: CGFloat = 32 * clampedScale
-                    let titleFontSize: CGFloat = 14 * clampedScale
-                    let timeFontSize: CGFloat = 11 * clampedScale
-                    let iconSize: CGFloat = 9 * clampedScale
-                    let strokeWidth: CGFloat = 2 * clampedScale
-                    let spacing: CGFloat = 12 * clampedScale
-                    let padding: CGFloat = 24 * clampedScale
-                    
                     VStack {
-                        HStack(alignment: .center, spacing: spacing) {
-                            // Progress ring
-                            ZStack {
-                                Circle()
-                                    .stroke(Color.white.opacity(0.15), lineWidth: strokeWidth)
-                                    .frame(width: ringSize, height: ringSize)
-
-                                Circle()
-                                    .trim(from: 0, to: audioPlayer.progress)
-                                    .stroke(Color.white.opacity(0.8), style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round))
-                                    .frame(width: ringSize, height: ringSize)
-                                    .rotationEffect(.degrees(-90))
-
-                                Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                                    .font(.system(size: iconSize))
-                                    .foregroundColor(.white.opacity(0.8))
-                            }
-                            .onTapGesture {
-                                audioPlayer.togglePlayPause()
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 2 * clampedScale) {
-                                Text(audioPlayer.audioFileName)
-                                    .font(.system(size: titleFontSize, weight: .medium, design: .default))
-                                    .foregroundColor(.white.opacity(0.8))
-                                
-                                Text(formatTime(audioPlayer.currentTime) + " / " + formatTime(audioPlayer.duration))
-                                    .font(.system(size: timeFontSize, weight: .medium, design: .monospaced))
-                                    .foregroundColor(.white.opacity(0.4))
-                            }
-                            
-                            Spacer()
-                        }
-                        .padding(.horizontal, padding)
-                        .padding(.top, 20 * clampedScale)
-                        
+                        FullScreenTrackInfoView()
                         Spacer()
                     }
                 }
-                
+
                 // Audio Visualizer at the bottom
                 if settings.showVisualizer {
                     AudioVisualizerView()
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 12)
+                        .padding(.horizontal, 24 * scale)
+                        .padding(.bottom, 12 * scale)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
-    
+}
+
+// MARK: - Full Screen Track Info + Track Picker
+
+/// The track-info card pinned to the top-left of full-screen lyrics mode: a
+/// progress ring that doubles as play/pause, the track title and elapsed time,
+/// and a chevron that reveals the track picker.
+///
+/// The chevron only fades in while the pointer is over the card, keeping the
+/// full-screen presentation clean until the user goes looking for it.
+struct FullScreenTrackInfoView: View {
+
+    @EnvironmentObject var audioPlayer: AudioPlayerManager
+    @Environment(\.uiScale) private var scale
+
+    @State private var isHovered = false
+    @State private var isExpanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8 * scale) {
+            HStack(alignment: .center, spacing: 12 * scale) {
+                // Progress ring (tap to play/pause)
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.15), lineWidth: 2 * scale)
+                        .frame(width: 32 * scale, height: 32 * scale)
+
+                    Circle()
+                        .trim(from: 0, to: audioPlayer.progress)
+                        .stroke(
+                            Color.white.opacity(0.8),
+                            style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round)
+                        )
+                        .frame(width: 32 * scale, height: 32 * scale)
+                        .rotationEffect(.degrees(-90))
+
+                    Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 9 * scale))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                .contentShape(Circle())
+                .onTapGesture {
+                    audioPlayer.togglePlayPause()
+                }
+
+                VStack(alignment: .leading, spacing: 2 * scale) {
+                    Text(audioPlayer.audioFileName)
+                        .font(.system(size: 14 * scale, weight: .medium, design: .default))
+                        .foregroundColor(.white.opacity(0.8))
+                        .lineLimit(1)
+
+                    Text(formatTime(audioPlayer.currentTime) + " / " + formatTime(audioPlayer.duration))
+                        .font(.system(size: 11 * scale, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+
+                // Track picker chevron — visible on hover, or while the list is open
+                Button(action: toggleExpanded) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13 * scale, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.55))
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .frame(width: 22 * scale, height: 22 * scale)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .opacity(isHovered || isExpanded ? 1 : 0)
+                .help("Choose a track")
+
+                Spacer(minLength: 0)
+            }
+
+            // Track picker dropdown, anchored under the card
+            if isExpanded {
+                FullScreenTrackListView { isExpanded = false }
+                    .transition(.opacity.combined(with: .offset(y: -8)))
+            }
+        }
+        .padding(.horizontal, 24 * scale)
+        .padding(.top, 20 * scale)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isHovered = hovering
+            }
+        }
+        .animation(.spring(response: 0.32, dampingFraction: 0.85), value: isExpanded)
+        // Collapse on Escape. The button is invisible but its shortcut stays live.
+        .background(
+            Button("") { isExpanded = false }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.escape, modifiers: [])
+                .opacity(0)
+                .allowsHitTesting(false)
+                .disabled(!isExpanded)
+        )
+    }
+
+    private func toggleExpanded() {
+        isExpanded.toggle()
+    }
+
     private func formatTime(_ time: TimeInterval) -> String {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
@@ -108,17 +165,18 @@ struct FullScreenLyricsView: View {
 struct FullScreenOneLineLyric: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
-    
+    @Environment(\.uiScale) private var scale
+
     var body: some View {
         VStack {
             Spacer()
             
             if let lyric = audioPlayer.oneLineModeLyric {
-                VStack(spacing: 10) {
+                VStack(spacing: 10 * scale) {
                     // Main lyric (top, bold, all caps) - with styled text support
                     if lyric.hasStyles {
                         lyric.styledMainText.attributedText(
-                            font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.3),
+                            font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.3 * scale),
                             brightness: settings.colorBrightness,
                             uppercased: true
                         )
@@ -128,7 +186,7 @@ struct FullScreenOneLineLyric: View {
                         .minimumScaleFactor(0.5)
                     } else {
                         Text(lyric.mainText.uppercased())
-                            .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.3))
+                            .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 1.3 * scale))
                             .fontWeight(.bold)
                             .foregroundColor(.white)
                             .multilineTextAlignment(.center)
@@ -140,7 +198,7 @@ struct FullScreenOneLineLyric: View {
                     if let styledBackground = lyric.styledBackgroundText {
                         if styledBackground.hasStyles {
                             styledBackground.attributedText(
-                                font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.85),
+                                font: .custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.85 * scale),
                                 opacity: 0.5,
                                 brightness: settings.colorBrightness,
                                 uppercased: true
@@ -151,7 +209,7 @@ struct FullScreenOneLineLyric: View {
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
                         } else {
                             Text(styledBackground.plainText.uppercased())
-                                .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.85))
+                                .font(.custom("MollenTrial-Bold", size: settings.lyricFontSize * 0.85 * scale))
                                 .foregroundColor(.white.opacity(0.5))
                                 .multilineTextAlignment(.center)
                                 .lineLimit(1)
@@ -160,7 +218,7 @@ struct FullScreenOneLineLyric: View {
                         }
                     }
                 }
-                .padding(.horizontal, 60)
+                .padding(.horizontal, 60 * scale)
                 .id(lyric.displayId)
                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
@@ -177,13 +235,14 @@ struct FullScreenOneLineLyric: View {
 struct FullScreenSmoothLyrics: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
-    
+    @Environment(\.uiScale) private var scale
+
     let containerHeight: CGFloat
-    
-    private let lineSpacing: CGFloat = 24
-    
+
+    private var lineSpacing: CGFloat { 24 * scale }
+
     private var fontSize: CGFloat {
-        settings.lyricFontSize * 1.2
+        settings.lyricFontSize * 1.2 * scale
     }
     
     private var lineHeight: CGFloat {
@@ -223,7 +282,7 @@ struct FullScreenSmoothLyrics: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
-        .padding(.horizontal, 60)
+        .padding(.horizontal, 60 * scale)
         .onChange(of: audioPlayer.currentLyricIndex) { _, newValue in
             withAnimation(.easeOut(duration: 0.3)) {
                 smoothIndex = CGFloat(newValue)
@@ -319,55 +378,56 @@ struct FullScreenLyricLine: View {
 struct FloatingControlsView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
+    @Environment(\.uiScale) private var scale
     @StateObject private var videoExporter = VideoExporter()
     @State private var showExportAlert = false
     @State private var exportMessage = ""
     @State private var exportSuccess = false
     
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 12 * scale) {
             // Export progress indicator
             if videoExporter.isExporting {
-                VStack(spacing: 8) {
+                VStack(spacing: 8 * scale) {
                     Text(videoExporter.statusMessage)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 12 * scale, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                     
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 2)
+                            RoundedRectangle(cornerRadius: 2 * scale)
                                 .fill(Color.white.opacity(0.2))
-                                .frame(height: 4)
+                                .frame(height: 4 * scale)
                             
-                            RoundedRectangle(cornerRadius: 2)
+                            RoundedRectangle(cornerRadius: 2 * scale)
                                 .fill(Color.white)
-                                .frame(width: geo.size.width * videoExporter.progress, height: 4)
+                                .frame(width: geo.size.width * videoExporter.progress, height: 4 * scale)
                         }
                     }
-                    .frame(width: 200, height: 4)
+                    .frame(width: 200 * scale, height: 4 * scale)
                     
                     Text("\(Int(videoExporter.progress * 100))%")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .font(.system(size: 11 * scale, weight: .medium, design: .monospaced))
                         .foregroundColor(.white.opacity(0.5))
                 }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 24 * scale)
+                .padding(.vertical, 8 * scale)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 12 * scale)
                         .fill(Color.black.opacity(0.6))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
+                            RoundedRectangle(cornerRadius: 12 * scale)
                                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
                         )
                 )
             }
             
             // Main controls
-            HStack(spacing: 20) {
+            HStack(spacing: 20 * scale) {
                 // Loop
                 Button(action: { audioPlayer.toggleLoop() }) {
                     Image(systemName: audioPlayer.isLooping ? "repeat.1" : "repeat")
-                        .font(.system(size: 14))
+                        .font(.system(size: 14 * scale))
                         .foregroundColor(audioPlayer.isLooping ? .white : .white.opacity(0.5))
                 }
                 .buttonStyle(.plain)
@@ -376,7 +436,7 @@ struct FloatingControlsView: View {
                 // Previous song
                 Button(action: { audioPlayer.playPreviousSong() }) {
                     Image(systemName: "backward.fill")
-                        .font(.system(size: 14))
+                        .font(.system(size: 14 * scale))
                         .foregroundColor(.white.opacity(0.5))
                 }
                 .buttonStyle(.plain)
@@ -387,10 +447,10 @@ struct FloatingControlsView: View {
                     ZStack {
                         Circle()
                             .fill(.white)
-                            .frame(width: 44, height: 44)
+                            .frame(width: 44 * scale, height: 44 * scale)
 
                         Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 16))
+                            .font(.system(size: 16 * scale))
                             .foregroundColor(.black)
                             .offset(x: audioPlayer.isPlaying ? 0 : 2)
                     }
@@ -401,7 +461,7 @@ struct FloatingControlsView: View {
                 // Next song
                 Button(action: { audioPlayer.playNextSong() }) {
                     Image(systemName: "forward.fill")
-                        .font(.system(size: 14))
+                        .font(.system(size: 14 * scale))
                         .foregroundColor(.white.opacity(0.5))
                 }
                 .buttonStyle(.plain)
@@ -410,12 +470,12 @@ struct FloatingControlsView: View {
                 // Divider
                 Rectangle()
                     .fill(Color.white.opacity(0.2))
-                    .frame(width: 1, height: 20)
+                    .frame(width: 1, height: 20 * scale)
 
                 // Export video button
                 Button(action: { startExport() }) {
                     Image(systemName: videoExporter.isExporting ? "arrow.clockwise" : "square.and.arrow.up")
-                        .font(.system(size: 14))
+                        .font(.system(size: 14 * scale))
                         .foregroundColor(videoExporter.isExporting ? .white.opacity(0.3) : .white.opacity(0.5))
                         .rotationEffect(.degrees(videoExporter.isExporting ? 360 : 0))
                         .animation(videoExporter.isExporting ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: videoExporter.isExporting)
@@ -427,14 +487,14 @@ struct FloatingControlsView: View {
                 // Exit fullscreen
                 Button(action: { settings.isFullScreen = false }) {
                     Image(systemName: "arrow.down.right.and.arrow.up.left")
-                        .font(.system(size: 14))
+                        .font(.system(size: 14 * scale))
                         .foregroundColor(.white.opacity(0.5))
                 }
                 .buttonStyle(.plain)
                 .disabled(videoExporter.isExporting)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 24 * scale)
+            .padding(.vertical, 12 * scale)
         }
         .alert(exportSuccess ? "Export Complete" : "Export Failed", isPresented: $showExportAlert) {
             Button("OK") { }
