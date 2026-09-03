@@ -8,6 +8,13 @@ import SwiftUI
 struct MainPlayerView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
+    @EnvironmentObject var library: LibraryManager
+
+    /// The library entry's title once there is one, so a rename made in
+    /// full-screen mode shows here as well.
+    private var displayTitle: String {
+        library.currentEntry?.title ?? audioPlayer.audioFileName
+    }
     
     var body: some View {
         GeometryReader { geo in
@@ -37,7 +44,7 @@ struct MainPlayerView: View {
                         
                         // Track Title (hideable)
                         if settings.showTrackTitle && !audioPlayer.audioFileName.isEmpty {
-                            Text(audioPlayer.audioFileName)
+                            Text(displayTitle)
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundColor(.white)
                                 .lineLimit(1)
@@ -91,7 +98,13 @@ struct MainPlayerView: View {
 struct VerticalModeView: View {
     @EnvironmentObject var audioPlayer: AudioPlayerManager
     @EnvironmentObject var settings: SettingsManager
+    @EnvironmentObject var library: LibraryManager
     @State private var showControls = false
+
+    private var displayTitle: String {
+        library.currentEntry?.title ?? audioPlayer.audioFileName
+    }
+
     @State private var controlsTimer: Timer?
     
     var body: some View {
@@ -102,7 +115,7 @@ struct VerticalModeView: View {
                     VStack(spacing: 10) {
                         // Track Title (centered)
                         if settings.showTrackTitle && !audioPlayer.audioFileName.isEmpty {
-                            Text(audioPlayer.audioFileName)
+                            Text(displayTitle)
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundColor(.white.opacity(0.85))
                                 .lineLimit(1)
@@ -599,6 +612,7 @@ struct AdditionalControlsView: View {
     MainPlayerView()
         .environmentObject(AudioPlayerManager())
         .environmentObject(SettingsManager())
+        .environmentObject(LibraryManager())
         .frame(width: 1000, height: 700)
         .background(Color.black)
 }

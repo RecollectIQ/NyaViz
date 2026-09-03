@@ -62,13 +62,34 @@ struct FullScreenLyricsView: View {
 ///
 /// The chevron only fades in while the pointer is over the card, keeping the
 /// full-screen presentation clean until the user goes looking for it.
+///
+/// Double-clicking the title renames the track.  Titles start out as the audio
+/// filename, which is often not something anyone would choose to read
+/// (`Nightcore_Bound_to_Break_sped_up_NV_`), so renaming is worth having close
+/// to where the name is actually displayed.
 struct FullScreenTrackInfoView: View {
 
     @EnvironmentObject var audioPlayer: AudioPlayerManager
+    @EnvironmentObject var library: LibraryManager
     @Environment(\.uiScale) private var scale
 
     @State private var isHovered = false
     @State private var isExpanded = false
+
+    @State private var isEditingTitle = false
+    @State private var draftTitle = ""
+    @FocusState private var titleFieldFocused: Bool
+
+    /// The library entry's title once there is one, falling back to the audio
+    /// filename for audio that has not been imported.
+    private var displayTitle: String {
+        library.currentEntry?.title ?? audioPlayer.audioFileName
+    }
+
+    /// Renaming writes to a library entry, so it is only offered when one exists.
+    private var canRename: Bool {
+        library.currentEntry != nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10 * scale) {
@@ -98,10 +119,29 @@ struct FullScreenTrackInfoView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2 * scale) {
-                    Text(audioPlayer.audioFileName)
-                        .font(.system(size: 14 * scale, weight: .medium, design: .default))
-                        .foregroundColor(.white.opacity(0.8))
-                        .lineLimit(1)
+                    if isEditingTitle {
+                        TextField("Track title", text: $draftTitle)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 14 * scale, weight: .medium, design: .default))
+                            .foregroundColor(.white)
+                            .focused($titleFieldFocused)
+                            .frame(maxWidth: 320 * scale)
+                            .padding(.horizontal, 6 * scale)
+                            .padding(.vertical, 2 * scale)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4 * scale)
+                                    .fill(Color.white.opacity(0.12))
+                            )
+                            .onSubmit { commitTitle() }
+                            .onExitCommand { cancelTitle() }
+                    } else {
+                        Text(displayTitle)
+                            .font(.system(size: 14 * scale, weight: .medium, design: .default))
+                            .foregroundColor(.white.opacity(0.8))
+                            .lineLimit(1)
+                            .onTapGesture(count: 2) { beginEditingTitle() }
+                            .help(canRename ? "Double-click to rename" : "")
+                    }
 
                     Text(formatTime(audioPlayer.currentTime) + " / " + formatTime(audioPlayer.duration))
                         .font(.system(size: 11 * scale, weight: .medium, design: .monospaced))
@@ -148,12 +188,39 @@ struct FullScreenTrackInfoView: View {
                 .keyboardShortcut(.escape, modifiers: [])
                 .opacity(0)
                 .allowsHitTesting(false)
-                .disabled(!isExpanded)
+                .disabled(!isExpanded || isEditingTitle)
         )
     }
 
     private func toggleExpanded() {
         isExpanded.toggle()
+    }
+
+    // MARK: - Renaming
+
+    private func beginEditingTitle() {
+        guard canRename else { return }
+        draftTitle = displayTitle
+        isEditingTitle = true
+        titleFieldFocused = true
+    }
+
+    /// Saves the edited title. An empty or unchanged title simply closes the
+    /// field — ``LibraryManager/renameEntry(id:to:)`` rejects the former.
+    private func commitTitle() {
+        defer { endEditing() }
+        guard let id = library.currentEntryId else { return }
+        library.renameEntry(id: id, to: draftTitle)
+    }
+
+    private func cancelTitle() {
+        endEditing()
+    }
+
+    private func endEditing() {
+        isEditingTitle = false
+        titleFieldFocused = false
+        draftTitle = ""
     }
 
     private func formatTime(_ time: TimeInterval) -> String {
